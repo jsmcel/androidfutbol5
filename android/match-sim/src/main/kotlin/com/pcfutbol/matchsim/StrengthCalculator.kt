@@ -77,6 +77,12 @@ object StrengthCalculator {
         }
         // Presión alta: más agotamiento pero más robamos
         if (t.tipoPresion == 3) bonus += 1.0
+        else if (t.tipoPresion == 1) bonus -= 0.5
+        if (t.tipoMarcaje == 1) bonus += 0.3
+        if (t.faltas == 3) bonus += 0.2
+        if (t.porcContra > 60) bonus += 0.3
+        if (t.tipoDespejes == 2) bonus += 0.2
+        if (t.perdidaTiempo == 1) bonus -= 0.4
         return bonus
     }
 }

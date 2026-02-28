@@ -93,6 +93,34 @@ fun ProManagerOffersScreen(
                     )
                 }
 
+                DosPanel(title = "RESUMEN DE CARRERA") {
+                    Text(
+                        text = "Prestigio: ${uiState.prestige}",
+                        color = DosYellow,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        text = "Temporadas: ${uiState.totalSeasons}",
+                        color = DosWhite,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                    )
+                    if (uiState.careerHistory.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        uiState.careerHistory.forEach { line ->
+                            Text(
+                                text = line,
+                                color = DosGray,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
                 DosPanel(title = "SELECCION DE OFERTAS") {
                     if (uiState.offers.isEmpty()) {
                         Text(

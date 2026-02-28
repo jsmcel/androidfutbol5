@@ -70,6 +70,7 @@ fun LigaSelectScreen(
     onStats: () -> Unit = {},
     onMatchday: (Int) -> Unit,
     onTeam: () -> Unit,
+    onManagerDepth: () -> Unit = {},
     onNews: () -> Unit,
     onRealFootball: () -> Unit = {},
     onMarket: () -> Unit,
@@ -232,6 +233,12 @@ fun LigaSelectScreen(
                         text = "MI PLANTILLA",
                         onClick = onTeam,
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    DosButton(
+                        text = "ENTRENAMIENTO + STAFF",
+                        onClick = onManagerDepth,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = DosYellow,
                     )
                     DosButton(
                         text = "NOTICIAS",

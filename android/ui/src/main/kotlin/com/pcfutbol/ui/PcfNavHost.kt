@@ -13,6 +13,7 @@ object Routes {
     const val SELECCION         = "/seleccion"
     const val PROMANAGER_OFFERS = "/promanager/offers"
     const val TEAM_SQUAD        = "/team"
+    const val MANAGER_DEPTH     = "/manager-depth"
     const val LINEUP            = "/lineup"
     const val TACTIC            = "/tactic"
     const val STATS             = "/stats"
@@ -52,6 +53,7 @@ fun PcfNavHost() {
                 onStandings = { comp -> navController.navigate(Routes.standings(comp)) },
                 onMatchday = { round -> navController.navigate(Routes.matchday(round)) },
                 onTeam = { navController.navigate(Routes.TEAM_SQUAD) },
+                onManagerDepth = { navController.navigate(Routes.MANAGER_DEPTH) },
                 onNews = { navController.navigate(Routes.NEWS) },
                 onMarket = { navController.navigate(Routes.TRANSFER_MARKET) },
                 onCopa = { navController.navigate(Routes.COPA) },
@@ -77,6 +79,10 @@ fun PcfNavHost() {
             )
         }
 
+        composable(Routes.MANAGER_DEPTH) {
+            ManagerDepthScreen(onNavigateUp = { navController.navigateUp() })
+        }
+
         composable(Routes.LINEUP) {
             LineupScreen(onNavigateUp = { navController.navigateUp() })
         }
@@ -100,7 +106,7 @@ fun PcfNavHost() {
 
         composable(Routes.MATCHDAY) { backStack ->
             val round = backStack.arguments?.getString("round")?.toIntOrNull() ?: 1
-            MatchdayScreen(
+            CoachMatchdayScreen(
                 matchday = round,
                 onNavigateUp = { navController.navigateUp() },
                 onMatchResult = { id -> navController.navigate(Routes.matchResult(id)) },

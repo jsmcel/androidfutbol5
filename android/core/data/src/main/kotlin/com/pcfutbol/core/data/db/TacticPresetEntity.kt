@@ -28,6 +28,7 @@ data class TacticPresetEntity(
     val puntoDefensa: Int = 40,
     val puntoAtaque: Int = 60,
     val area: Int = 50,
+    val perdidaTiempo: Int = 0,     // 0=normal 1=ralentizar partido
     // Alineación: 11 player IDs ordenados por posición (null = vacío)
     val lineupJson: String = "[]",
 )

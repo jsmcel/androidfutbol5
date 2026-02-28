@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import javax.inject.Inject
 
 data class OfferUiItem(
@@ -31,6 +32,9 @@ data class ProManagerUiState(
     val managerNames: List<String> = emptyList(),
     val offers: List<OfferUiItem> = emptyList(),
     val selectedOfferId: Int = -1,
+    val prestige: Int = 1,
+    val totalSeasons: Int = 0,
+    val careerHistory: List<String> = emptyList(),
     val error: String? = null,
     val offerAccepted: Boolean = false,
 )
@@ -80,12 +84,16 @@ class ProManagerViewModel @Inject constructor(
 
     private suspend fun loadOffers(managerId: Int, managerName: String) {
         val offers = repo.generateOffers(managerId).map { it.toUiItem() }
+        val profile = repo.managerById(managerId)
         _uiState.value = ProManagerUiState(
             noManager    = false,
             pendingLogin = false,
             managerId    = managerId,
             managerName  = managerName,
             offers       = offers,
+            prestige = profile?.prestige ?: 1,
+            totalSeasons = profile?.totalSeasons ?: 0,
+            careerHistory = parseCareerHistory(profile?.careerHistoryJson.orEmpty()),
         )
     }
 
@@ -127,4 +135,22 @@ class ProManagerViewModel @Inject constructor(
             else -> "Competir"
         },
     )
+
+    private fun parseCareerHistory(raw: String): List<String> {
+        if (raw.isBlank()) return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (i in maxOf(0, array.length() - 5) until array.length()) {
+                    val obj = array.optJSONObject(i) ?: continue
+                    val season = obj.optString("season", "?")
+                    val team = obj.optString("team", "Equipo")
+                    val comp = obj.optString("competition", "?")
+                    val pos = obj.optInt("position", 0)
+                    val ok = obj.optBoolean("objectiveMet", false)
+                    add("$season | $team ($comp) | Pos $pos | ${if (ok) "Objetivo OK" else "Objetivo NO"}")
+                }
+            }.asReversed()
+        }.getOrDefault(emptyList())
+    }
 }

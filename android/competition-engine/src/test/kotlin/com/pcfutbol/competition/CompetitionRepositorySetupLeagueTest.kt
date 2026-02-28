@@ -4,10 +4,12 @@ import com.pcfutbol.core.data.db.CompetitionDao
 import com.pcfutbol.core.data.db.CompetitionEntity
 import com.pcfutbol.core.data.db.FixtureDao
 import com.pcfutbol.core.data.db.FixtureEntity
+import com.pcfutbol.core.data.db.ManagerProfileDao
 import com.pcfutbol.core.data.db.PlayerDao
 import com.pcfutbol.core.data.db.SeasonStateDao
 import com.pcfutbol.core.data.db.StandingDao
 import com.pcfutbol.core.data.db.StandingEntity
+import com.pcfutbol.core.data.db.TacticPresetDao
 import com.pcfutbol.core.data.db.TeamDao
 import com.pcfutbol.core.data.db.TeamEntity
 import io.mockk.coEvery
@@ -30,6 +32,8 @@ class CompetitionRepositorySetupLeagueTest {
         val teamDao = mockk<TeamDao>()
         val playerDao = mockk<PlayerDao>(relaxed = true)
         val seasonStateDao = mockk<SeasonStateDao>(relaxed = true)
+        val managerProfileDao = mockk<ManagerProfileDao>(relaxed = true)
+        val tacticPresetDao = mockk<TacticPresetDao>(relaxed = true)
 
         val teamCount = 20
         val teams = (1..teamCount).map { makeTeam(it, "PRML") }
@@ -53,6 +57,8 @@ class CompetitionRepositorySetupLeagueTest {
             teamDao = teamDao,
             playerDao = playerDao,
             seasonStateDao = seasonStateDao,
+            managerProfileDao = managerProfileDao,
+            tacticPresetDao = tacticPresetDao,
         )
 
         repository.setupLeague("PRML")
@@ -76,6 +82,8 @@ class CompetitionRepositorySetupLeagueTest {
         val teamDao = mockk<TeamDao>()
         val playerDao = mockk<PlayerDao>(relaxed = true)
         val seasonStateDao = mockk<SeasonStateDao>(relaxed = true)
+        val managerProfileDao = mockk<ManagerProfileDao>(relaxed = true)
+        val tacticPresetDao = mockk<TacticPresetDao>(relaxed = true)
 
         val teams = (1..5).map { makeTeam(it, "LIGA2") }
         val fixtureSlot = slot<List<FixtureEntity>>()
@@ -96,6 +104,8 @@ class CompetitionRepositorySetupLeagueTest {
             teamDao = teamDao,
             playerDao = playerDao,
             seasonStateDao = seasonStateDao,
+            managerProfileDao = managerProfileDao,
+            tacticPresetDao = tacticPresetDao,
         )
 
         repository.setupLeague("LIGA2")

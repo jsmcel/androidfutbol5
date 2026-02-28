@@ -29,6 +29,8 @@ class CompetitionRepository @Inject constructor(
     private val teamDao: TeamDao,
     private val playerDao: PlayerDao,
     private val seasonStateDao: SeasonStateDao,
+    private val managerProfileDao: ManagerProfileDao,
+    private val tacticPresetDao: TacticPresetDao,
 ) {
 
     fun standings(comp: String): Flow<List<StandingWithTeam>> =
@@ -242,11 +244,36 @@ class CompetitionRepository @Inject constructor(
             .filter { it.id !in preferredIds }
             .sortedByDescending { it.ca }
         val starters = (preferred + fallback).take(11)
+        val tactic = resolveTeamTactic(teamId)
         return TeamMatchInput(
             teamId   = teamId,
             teamName = teamDao.byId(teamId)?.nameShort ?: "Equipo $teamId",
             squad    = starters.map { it.toSimAttrs() },
+            tactic   = tactic,
             isHome   = isHome,
+        )
+    }
+
+    private suspend fun resolveTeamTactic(teamId: Int): TacticParams {
+        val state = seasonStateDao.get() ?: return TacticParams()
+        if (state.managerTeamId != teamId) return TacticParams()
+
+        val managerProfileId = managerProfileDao.byTeam(teamId)?.id ?: teamId
+        val preset = tacticPresetDao.bySlot(managerProfileId, 0) ?: return TacticParams()
+        return TacticParams(
+            tipoJuego = preset.tipoJuego,
+            tipoMarcaje = preset.tipoMarcaje,
+            tipoPresion = preset.tipoPresion,
+            tipoDespejes = preset.tipoDespejes,
+            faltas = preset.faltas,
+            porcToque = preset.porcToque,
+            porcContra = preset.porcContra,
+            marcajeDefensas = preset.marcajeDefensas,
+            marcajeMedios = preset.marcajeMedios,
+            puntoDefensa = preset.puntoDefensa,
+            puntoAtaque = preset.puntoAtaque,
+            area = preset.area,
+            perdidaTiempo = preset.perdidaTiempo,
         )
     }
 

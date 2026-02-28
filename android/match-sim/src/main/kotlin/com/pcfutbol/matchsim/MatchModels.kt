@@ -38,6 +38,7 @@ data class TacticParams(
     val puntoDefensa: Int = 40,
     val puntoAtaque: Int = 60,
     val area: Int = 50,
+    val perdidaTiempo: Int = 0,     // 0=normal 1=ralentizar ritmo
 )
 
 /** Input de un equipo al simulador */
@@ -51,7 +52,7 @@ data class TeamMatchInput(
 
 /** Tipo de evento en el partido */
 enum class EventType {
-    GOAL, OWN_GOAL, YELLOW_CARD, RED_CARD, SUBSTITUTION, INJURY, VAR_DISALLOWED
+    GOAL, OWN_GOAL, YELLOW_CARD, RED_CARD, SUBSTITUTION, INJURY, VAR_DISALLOWED, TIME_WASTING
 }
 
 /** Evento de partido */

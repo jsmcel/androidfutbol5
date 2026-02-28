@@ -209,6 +209,16 @@ fun TacticScreen(
                         value = preset.porcContra,
                         onValueChange = { vm.updateParam("porcContra", it) }
                     )
+
+                    TacticOptionSelector(
+                        label = "PERDIDA DE TIEMPO",
+                        selectedValue = preset.perdidaTiempo,
+                        options = listOf(
+                            0 to "NO",
+                            1 to "SI"
+                        ),
+                        onSelect = { vm.updateParam("perdidaTiempo", it) }
+                    )
                 }
             }
         }

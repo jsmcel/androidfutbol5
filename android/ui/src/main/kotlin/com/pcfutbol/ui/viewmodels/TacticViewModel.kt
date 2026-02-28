@@ -60,6 +60,7 @@ class TacticViewModel @Inject constructor(
             "faltas" -> current.copy(faltas = value)
             "porcToque" -> current.copy(porcToque = value)
             "porcContra" -> current.copy(porcContra = value)
+            "perdidaTiempo" -> current.copy(perdidaTiempo = value.coerceIn(0, 1))
             else -> return
         }
         _uiState.value = _uiState.value.copy(

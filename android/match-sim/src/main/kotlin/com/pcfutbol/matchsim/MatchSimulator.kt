@@ -32,20 +32,28 @@ object MatchSimulator {
         val homeStrength = StrengthCalculator.calculate(ctx.home)
         val awayStrength = StrengthCalculator.calculate(ctx.away)
         val disciplineSummary = generateDisciplinaryEvents(ctx, rng)
+        val pace = paceAdjustments(ctx)
 
         // λ de Poisson calibrado con ventaja local (+12%)
-        val homeLambda = applyExpulsionPenalty(
+        val homeLambda = applyPaceFactor(
+            applyExpulsionPenalty(
             lambda = strengthToLambda(homeStrength, isHome = !ctx.neutral),
             redCards = disciplineSummary.homeRedCards,
+            ),
+            pace.homeFactor,
         )
-        val awayLambda = applyExpulsionPenalty(
+        val awayLambda = applyPaceFactor(
+            applyExpulsionPenalty(
             lambda = strengthToLambda(awayStrength, isHome = false),
             redCards = disciplineSummary.awayRedCards,
+            ),
+            pace.awayFactor,
         )
 
         val homeGoalsRaw = poissonSample(homeLambda, rng)
         val awayGoalsRaw = poissonSample(awayLambda, rng)
         val injuryEvents = generateInjuryEvents(ctx, rng)
+        val timeWastingSummary = generateTimeWastingEvents(ctx, rng)
 
         // Aplicar VAR
         val homeVarResult = applyVarToGoals(ctx.home, homeGoalsRaw, rng)
@@ -59,11 +67,11 @@ object MatchSimulator {
         val totalYellows = disciplineSummary.events.count { it.type == EventType.YELLOW_CARD }
         val totalVarReviews = homeVarResult.varReviews + awayVarResult.varReviews
         val totalGoals = homeGoals + awayGoals
-        val addedBase = (totalYellows / 3) + totalVarReviews + (totalGoals / 3)
+        val addedBase = (totalYellows / 3) + totalVarReviews + (totalGoals / 3) + timeWastingSummary.addedTimeBias
         val addedTime1 = (addedBase / 2 + rng.nextInt(1, 4)).coerceIn(1, 6)
         val addedTime2 = (addedBase / 2 + rng.nextInt(2, 6)).coerceIn(2, 10)
 
-        val allEvents = (disciplineSummary.events + injuryEvents + goalEvents
+        val allEvents = (disciplineSummary.events + injuryEvents + goalEvents + timeWastingSummary.events
                 + homeVarResult.varEvents + awayVarResult.varEvents)
             .sortedBy { it.minute }
 
@@ -165,6 +173,62 @@ object MatchSimulator {
     internal fun applyExpulsionPenalty(lambda: Double, redCards: Int): Double {
         if (redCards <= 0) return lambda
         return (lambda * 0.8).coerceAtLeast(0.1)
+    }
+
+    private data class PaceAdjustments(
+        val homeFactor: Double,
+        val awayFactor: Double,
+    )
+
+    private data class TimeWastingSummary(
+        val events: List<MatchEvent>,
+        val addedTimeBias: Int,
+    )
+
+    private fun paceAdjustments(ctx: MatchContext): PaceAdjustments {
+        val homeWaste = ctx.home.tactic.perdidaTiempo == 1
+        val awayWaste = ctx.away.tactic.perdidaTiempo == 1
+        return when {
+            homeWaste && awayWaste -> PaceAdjustments(homeFactor = 0.82, awayFactor = 0.82)
+            homeWaste -> PaceAdjustments(homeFactor = 0.88, awayFactor = 0.92)
+            awayWaste -> PaceAdjustments(homeFactor = 0.92, awayFactor = 0.88)
+            else -> PaceAdjustments(homeFactor = 1.0, awayFactor = 1.0)
+        }
+    }
+
+    private fun applyPaceFactor(lambda: Double, paceFactor: Double): Double =
+        (lambda * paceFactor).coerceAtLeast(0.1)
+
+    private fun generateTimeWastingEvents(
+        ctx: MatchContext,
+        rng: Random,
+    ): TimeWastingSummary {
+        val events = mutableListOf<MatchEvent>()
+        var bias = 0
+        if (ctx.home.tactic.perdidaTiempo == 1) {
+            events += createTimeWastingEventsForTeam(ctx.home, rng)
+            bias += 1 + rng.nextInt(0, 2)
+        }
+        if (ctx.away.tactic.perdidaTiempo == 1) {
+            events += createTimeWastingEventsForTeam(ctx.away, rng)
+            bias += 1 + rng.nextInt(0, 2)
+        }
+        return TimeWastingSummary(events.sortedBy { it.minute }, bias.coerceIn(0, 4))
+    }
+
+    private fun createTimeWastingEventsForTeam(
+        team: TeamMatchInput,
+        rng: Random,
+    ): List<MatchEvent> {
+        val count = rng.nextInt(1, 4)
+        return (0 until count).map {
+            MatchEvent(
+                minute = rng.nextInt(70, 94),
+                type = EventType.TIME_WASTING,
+                teamId = team.teamId,
+                description = "Perdida de tiempo de ${team.teamName}",
+            )
+        }
     }
 
     // -------------------------------------------------------------------------
