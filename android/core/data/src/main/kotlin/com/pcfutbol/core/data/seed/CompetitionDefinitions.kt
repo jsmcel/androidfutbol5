@@ -17,6 +17,10 @@ object CompetitionDefinitions {
     const val RFEF2C = "RFEF2C"
     const val RFEF2D = "RFEF2D"
     const val CEURO = "CEURO"
+    const val RECOPA = "RECOPA"
+    const val CUEFA = "CUEFA"
+    const val SCESP = "SCESP"
+    const val SCEUR = "SCEUR"
     const val DEFAULT_MANAGER_LEAGUE = LIGA1
 
     private const val DEFAULT_TIEBREAK = "STANDARD"
@@ -77,10 +81,10 @@ object CompetitionDefinitions {
         leagueTemplates.associate { it.code to it.name } + mapOf(
             "CREY" to "Copa del Rey",
             CEURO to "UEFA Champions League",
-            "RECOPA" to "UEFA Europa League",
-            "CUEFA" to "UEFA Conference League",
-            "SCESP" to "Supercopa de Espana",
-            "SCEUR" to "Supercopa de Europa",
+            RECOPA to "UEFA Europa League",
+            CUEFA to "UEFA Conference League",
+            SCESP to "Supercopa de Espana",
+            SCEUR to "Supercopa de Europa",
             "FOREIGN" to "Liga Extranjera",
         )
 
@@ -125,10 +129,10 @@ object CompetitionDefinitions {
     private val cupDefinitions: List<SeedCompetition> = listOf(
         SeedCompetition("CREY", "Copa del Rey", "KNOCKOUT", 32, 0, 0, 0, 1, 0, DEFAULT_TIEBREAK),
         SeedCompetition(CEURO, "UEFA Champions League", "GROUP_KNOCKOUT", 36, 8, 0, 0, 0, 0, DEFAULT_TIEBREAK),
-        SeedCompetition("RECOPA", "UEFA Europa League", "GROUP_KNOCKOUT", 36, 8, 0, 0, 0, 0, DEFAULT_TIEBREAK),
-        SeedCompetition("CUEFA", "UEFA Conference League", "GROUP_KNOCKOUT", 36, 8, 0, 0, 0, 0, DEFAULT_TIEBREAK),
-        SeedCompetition("SCESP", "Supercopa de Espana", "KNOCKOUT", 4, 0, 0, 0, 0, 0, DEFAULT_TIEBREAK),
-        SeedCompetition("SCEUR", "Supercopa de Europa", "KNOCKOUT", 2, 0, 0, 0, 0, 0, DEFAULT_TIEBREAK),
+        SeedCompetition(RECOPA, "UEFA Europa League", "GROUP_KNOCKOUT", 36, 8, 0, 0, 0, 0, DEFAULT_TIEBREAK),
+        SeedCompetition(CUEFA, "UEFA Conference League", "GROUP_KNOCKOUT", 36, 8, 0, 0, 0, 0, DEFAULT_TIEBREAK),
+        SeedCompetition(SCESP, "Supercopa de Espana", "KNOCKOUT", 4, 0, 0, 0, 0, 0, DEFAULT_TIEBREAK),
+        SeedCompetition(SCEUR, "Supercopa de Europa", "KNOCKOUT", 2, 0, 0, 0, 0, 0, DEFAULT_TIEBREAK),
         SeedCompetition("FOREIGN", "Liga Extranjera", "NONE", 0, 0, 0, 0, 0, 0, DEFAULT_TIEBREAK),
     )
 

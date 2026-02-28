@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.pcfutbol.core.data.seed.CompetitionDefinitions
 import com.pcfutbol.ui.components.DosButton
 import com.pcfutbol.ui.components.DosPanel
 import com.pcfutbol.ui.components.MatchResultRow
@@ -63,7 +64,7 @@ fun ChampionsScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = DosCyan)
             }
             Text(
-                text = "CHAMPIONS LEAGUE",
+                text = competitionTitle(state.selectedCompetition),
                 color = DosYellow,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
@@ -71,6 +72,32 @@ fun ChampionsScreen(
                 modifier = Modifier.padding(top = 12.dp),
             )
             Spacer(Modifier.width(48.dp))
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CompetitionTab(
+                text = "UCL",
+                selected = state.selectedCompetition == CompetitionDefinitions.CEURO,
+                onClick = { vm.selectCompetition(CompetitionDefinitions.CEURO) },
+                modifier = Modifier.weight(1f),
+            )
+            CompetitionTab(
+                text = "UEL",
+                selected = state.selectedCompetition == CompetitionDefinitions.RECOPA,
+                onClick = { vm.selectCompetition(CompetitionDefinitions.RECOPA) },
+                modifier = Modifier.weight(1f),
+            )
+            CompetitionTab(
+                text = "UECL",
+                selected = state.selectedCompetition == CompetitionDefinitions.CUEFA,
+                onClick = { vm.selectCompetition(CompetitionDefinitions.CUEFA) },
+                modifier = Modifier.weight(1f),
+            )
         }
 
         Spacer(Modifier.height(4.dp))
@@ -101,14 +128,14 @@ fun ChampionsScreen(
 
                 state.fixtures.isEmpty() && !state.tournamentComplete -> {
                     Text(
-                        text = "Champions no iniciada esta temporada.",
+                        text = "Competicion no iniciada esta temporada.",
                         color = DosGray,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(12.dp))
                     DosButton(
-                        text = "INICIAR CHAMPIONS",
+                        text = "INICIAR ${competitionShort(state.selectedCompetition)}",
                         onClick = vm::setup,
                         color = DosYellow,
                         modifier = Modifier.fillMaxWidth(),
@@ -147,7 +174,7 @@ fun ChampionsScreen(
 
         if (state.tournamentComplete) {
             Spacer(Modifier.height(8.dp))
-            DosPanel(title = "CAMPEON DE EUROPA") {
+            DosPanel(title = "CAMPEON") {
                 Text(
                     text = state.winnerName.ifBlank { "Desconocido" },
                     color = DosYellow,
@@ -170,9 +197,46 @@ fun ChampionsScreen(
     }
 }
 
+@Composable
+private fun CompetitionTab(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DosButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        color = if (selected) DosGreen else DosCyan,
+    )
+}
+
+private fun competitionTitle(code: String): String = when (code) {
+    CompetitionDefinitions.CEURO -> "UEFA CHAMPIONS LEAGUE"
+    CompetitionDefinitions.RECOPA -> "UEFA EUROPA LEAGUE"
+    CompetitionDefinitions.CUEFA -> "UEFA CONFERENCE LEAGUE"
+    else -> "COMPETICION UEFA"
+}
+
+private fun competitionShort(code: String): String = when (code) {
+    CompetitionDefinitions.CEURO -> "CHAMPIONS"
+    CompetitionDefinitions.RECOPA -> "EUROPA LEAGUE"
+    CompetitionDefinitions.CUEFA -> "CONFERENCE"
+    else -> "COMPETICION"
+}
+
 private fun roundLabel(round: String): String = when (round) {
-    "QF" -> "CUARTOS"
-    "SF" -> "SEMIFINALES"
+    "LP1", "LP2", "LP3", "LP4", "LP5", "LP6", "LP7", "LP8" ->
+        "FASE LIGA J${round.removePrefix("LP")}"
+    "POF1" -> "PLAYOFF IDA"
+    "POF2" -> "PLAYOFF VUELTA"
+    "R16_1" -> "OCTAVOS IDA"
+    "R16_2" -> "OCTAVOS VUELTA"
+    "QF1" -> "CUARTOS IDA"
+    "QF2" -> "CUARTOS VUELTA"
+    "SF1" -> "SEMIFINAL IDA"
+    "SF2" -> "SEMIFINAL VUELTA"
     "F" -> "FINAL"
     "DONE" -> "FINALIZADA"
     else -> round
