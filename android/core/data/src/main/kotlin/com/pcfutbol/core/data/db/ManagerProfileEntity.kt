@@ -19,5 +19,15 @@ data class ManagerProfileEntity(
     val promotionsAchieved: Int = 0,
     val relegationsSuffered: Int = 0,
     val careerHistoryJson: String = "[]", // JSON array de ManagerSeasonRecord
+    val segundoEntrenador: Int = 50,
+    val fisio: Int = 50,
+    val psicologo: Int = 50,
+    val asistente: Int = 50,
+    val secretario: Int = 50,
+    val ojeador: Int = 50,
+    val juveniles: Int = 50,
+    val cuidador: Int = 50,
+    val trainingIntensity: String = "MEDIUM",
+    val trainingFocus: String = "BALANCED",
     val isActive: Boolean = true,
 )

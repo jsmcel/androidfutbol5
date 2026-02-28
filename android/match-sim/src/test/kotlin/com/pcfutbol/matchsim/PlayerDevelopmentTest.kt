@@ -81,6 +81,77 @@ class PlayerDevelopmentTest {
         assertEquals(first, second)
     }
 
+    @Test
+    fun `high physio softens veteran decline`() {
+        val player = basePlayer(id = 40, birthYear = 1990, ve = 60, re = 60)
+        val lowPhysio = PlayerDevelopmentEngine.DevelopmentContext(
+            staff = PlayerDevelopmentEngine.StaffProfile(fisio = 20),
+            training = PlayerDevelopmentEngine.TrainingPlan(
+                intensity = PlayerDevelopmentEngine.TrainingIntensity.HIGH,
+            ),
+        )
+        val highPhysio = PlayerDevelopmentEngine.DevelopmentContext(
+            staff = PlayerDevelopmentEngine.StaffProfile(fisio = 95),
+            training = PlayerDevelopmentEngine.TrainingPlan(
+                intensity = PlayerDevelopmentEngine.TrainingIntensity.HIGH,
+            ),
+        )
+
+        val lowEvolved = PlayerDevelopmentEngine.applySeasonGrowth(
+            players = listOf(player),
+            seasonStartYear = 2025,
+            seed = 1010L,
+            context = lowPhysio,
+        ).first()
+        val highEvolved = PlayerDevelopmentEngine.applySeasonGrowth(
+            players = listOf(player),
+            seasonStartYear = 2025,
+            seed = 1010L,
+            context = highPhysio,
+        ).first()
+
+        assertTrue(highEvolved.ve >= lowEvolved.ve)
+        assertTrue(highEvolved.re >= lowEvolved.re)
+    }
+
+    @Test
+    fun `youth intake quality improves with scouting and juveniles staff`() {
+        val lowContext = PlayerDevelopmentEngine.DevelopmentContext(
+            staff = PlayerDevelopmentEngine.StaffProfile(
+                segundoEntrenador = 20,
+                ojeador = 20,
+                juveniles = 20,
+            ),
+        )
+        val highContext = PlayerDevelopmentEngine.DevelopmentContext(
+            staff = PlayerDevelopmentEngine.StaffProfile(
+                segundoEntrenador = 90,
+                ojeador = 90,
+                juveniles = 90,
+            ),
+        )
+
+        val lowYouth = PlayerDevelopmentEngine.generateYouthPlayers(
+            teamSlotId = 12,
+            count = 20,
+            seasonStartYear = 2025,
+            seed = 2026L,
+            context = lowContext,
+        )
+        val highYouth = PlayerDevelopmentEngine.generateYouthPlayers(
+            teamSlotId = 12,
+            count = 20,
+            seasonStartYear = 2025,
+            seed = 2026L,
+            context = highContext,
+        )
+
+        val lowQuality = lowYouth.map { it.ca + it.pase + it.regate }.average()
+        val highQuality = highYouth.map { it.ca + it.pase + it.regate }.average()
+
+        assertTrue(highQuality > lowQuality)
+    }
+
     private fun basePlayer(
         id: Int,
         birthYear: Int,

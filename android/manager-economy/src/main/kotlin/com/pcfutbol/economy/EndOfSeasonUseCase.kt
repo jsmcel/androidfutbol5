@@ -2,6 +2,7 @@ package com.pcfutbol.economy
 
 import com.pcfutbol.core.data.db.CompetitionDao
 import com.pcfutbol.core.data.db.FixtureDao
+import com.pcfutbol.core.data.db.ManagerProfileDao
 import com.pcfutbol.core.data.db.NewsDao
 import com.pcfutbol.core.data.db.NewsEntity
 import com.pcfutbol.core.data.db.PlayerDao
@@ -61,6 +62,7 @@ class EndOfSeasonUseCase @Inject constructor(
     private val teamDao: TeamDao,
     private val competitionDao: CompetitionDao,
     private val seasonStateDao: SeasonStateDao,
+    private val managerProfileDao: ManagerProfileDao,
     private val newsDao: NewsDao,
     private val playerDao: PlayerDao,
     private val fixtureDao: FixtureDao,
@@ -346,6 +348,7 @@ class EndOfSeasonUseCase @Inject constructor(
         val seed = state.season.hashCode().toLong()
         val allPlayers = playerDao.allPlayers().first()
         if (allPlayers.isEmpty()) return
+        val managerContext = buildDevelopmentContext(state.managerTeamId)
 
         val source = allPlayers.map { p ->
             PlayerDevelopmentEngine.DevelopmentPlayer(
@@ -369,6 +372,7 @@ class EndOfSeasonUseCase @Inject constructor(
             players = source,
             seasonStartYear = seasonStartYear,
             seed = seed,
+            context = managerContext,
         ).associateBy { it.id }
 
         val updatedPlayers = allPlayers.map { p ->
@@ -397,11 +401,16 @@ class EndOfSeasonUseCase @Inject constructor(
 
         val managerTeam = teamDao.byId(managerTeamId) ?: return
         val nextPid = (updatedPlayers.maxOfOrNull { it.pid } ?: 0) + 1
+        val youthCount = 2 + if (
+            managerContext.staff.juveniles >= 80 &&
+            managerContext.staff.ojeador >= 70
+        ) 1 else 0
         val youthPlayers = PlayerDevelopmentEngine.generateYouthPlayers(
             teamSlotId = managerTeamId,
-            count = 2,
+            count = youthCount,
             seasonStartYear = seasonStartYear,
             seed = seed xor managerTeamId.toLong(),
+            context = managerContext,
         )
 
         val youthEntities = youthPlayers.mapIndexed { index, youth ->
@@ -456,6 +465,37 @@ class EndOfSeasonUseCase @Inject constructor(
 
     private fun parseSeasonStartYear(season: String): Int =
         season.substringBefore("-").toIntOrNull() ?: 2025
+
+    private suspend fun buildDevelopmentContext(
+        managerTeamId: Int,
+    ): PlayerDevelopmentEngine.DevelopmentContext {
+        val profile = managerProfileDao.byTeam(managerTeamId)
+            ?: return PlayerDevelopmentEngine.DevelopmentContext()
+        return PlayerDevelopmentEngine.DevelopmentContext(
+            staff = PlayerDevelopmentEngine.StaffProfile(
+                segundoEntrenador = profile.segundoEntrenador,
+                fisio = profile.fisio,
+                psicologo = profile.psicologo,
+                asistente = profile.asistente,
+                secretario = profile.secretario,
+                ojeador = profile.ojeador,
+                juveniles = profile.juveniles,
+                cuidador = profile.cuidador,
+            ),
+            training = PlayerDevelopmentEngine.TrainingPlan(
+                intensity = parseIntensity(profile.trainingIntensity),
+                focus = parseFocus(profile.trainingFocus),
+            ),
+        )
+    }
+
+    private fun parseIntensity(value: String): PlayerDevelopmentEngine.TrainingIntensity =
+        runCatching { PlayerDevelopmentEngine.TrainingIntensity.valueOf(value.uppercase()) }
+            .getOrDefault(PlayerDevelopmentEngine.TrainingIntensity.MEDIUM)
+
+    private fun parseFocus(value: String): PlayerDevelopmentEngine.TrainingFocus =
+        runCatching { PlayerDevelopmentEngine.TrainingFocus.valueOf(value.uppercase()) }
+            .getOrDefault(PlayerDevelopmentEngine.TrainingFocus.BALANCED)
 
     private fun defaultRolesForPosition(position: String): String = when (position) {
         "PO" -> "[0,0,0,0,0,0]"
