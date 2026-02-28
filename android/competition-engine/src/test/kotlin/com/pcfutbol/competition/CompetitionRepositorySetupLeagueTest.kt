@@ -5,6 +5,7 @@ import com.pcfutbol.core.data.db.CompetitionEntity
 import com.pcfutbol.core.data.db.FixtureDao
 import com.pcfutbol.core.data.db.FixtureEntity
 import com.pcfutbol.core.data.db.ManagerProfileDao
+import com.pcfutbol.core.data.db.NewsDao
 import com.pcfutbol.core.data.db.PlayerDao
 import com.pcfutbol.core.data.db.SeasonStateDao
 import com.pcfutbol.core.data.db.StandingDao
@@ -34,6 +35,7 @@ class CompetitionRepositorySetupLeagueTest {
         val seasonStateDao = mockk<SeasonStateDao>(relaxed = true)
         val managerProfileDao = mockk<ManagerProfileDao>(relaxed = true)
         val tacticPresetDao = mockk<TacticPresetDao>(relaxed = true)
+        val newsDao = mockk<NewsDao>(relaxed = true)
 
         val teamCount = 20
         val teams = (1..teamCount).map { makeTeam(it, "PRML") }
@@ -59,6 +61,7 @@ class CompetitionRepositorySetupLeagueTest {
             seasonStateDao = seasonStateDao,
             managerProfileDao = managerProfileDao,
             tacticPresetDao = tacticPresetDao,
+            newsDao = newsDao,
         )
 
         repository.setupLeague("PRML")
@@ -84,6 +87,7 @@ class CompetitionRepositorySetupLeagueTest {
         val seasonStateDao = mockk<SeasonStateDao>(relaxed = true)
         val managerProfileDao = mockk<ManagerProfileDao>(relaxed = true)
         val tacticPresetDao = mockk<TacticPresetDao>(relaxed = true)
+        val newsDao = mockk<NewsDao>(relaxed = true)
 
         val teams = (1..5).map { makeTeam(it, "LIGA2") }
         val fixtureSlot = slot<List<FixtureEntity>>()
@@ -106,6 +110,7 @@ class CompetitionRepositorySetupLeagueTest {
             seasonStateDao = seasonStateDao,
             managerProfileDao = managerProfileDao,
             tacticPresetDao = tacticPresetDao,
+            newsDao = newsDao,
         )
 
         repository.setupLeague("LIGA2")

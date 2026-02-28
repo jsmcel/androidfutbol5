@@ -31,6 +31,7 @@ class CompetitionRepository @Inject constructor(
     private val seasonStateDao: SeasonStateDao,
     private val managerProfileDao: ManagerProfileDao,
     private val tacticPresetDao: TacticPresetDao,
+    private val newsDao: NewsDao,
 ) {
 
     fun standings(comp: String): Flow<List<StandingWithTeam>> =
@@ -66,6 +67,8 @@ class CompetitionRepository @Inject constructor(
 
         val fixtures = fixtureDao.byMatchday(competitionCode, matchday)
             .filter { !it.played }
+        val seasonState = seasonStateDao.get()
+        val managerTeamId = seasonState?.managerTeamId ?: -1
 
         val results = mutableListOf<MatchResult>()
         fixtures.forEach { fixture ->
@@ -82,6 +85,12 @@ class CompetitionRepository @Inject constructor(
             )
             fixtureDao.updateEventsJson(fixture.id, serializeEvents(result.events))
             applyPostMatchEffects(fixture, result)
+            publishMatchNews(
+                fixture = fixture,
+                result = result,
+                matchday = matchday,
+                managerTeamId = managerTeamId,
+            )
             results += result
         }
 
@@ -342,5 +351,40 @@ class CompetitionRepository @Inject constructor(
             array.put(obj)
         }
         return array.toString()
+    }
+
+    private suspend fun publishMatchNews(
+        fixture: FixtureEntity,
+        result: MatchResult,
+        matchday: Int,
+        managerTeamId: Int,
+    ) {
+        val homeName = teamDao.byId(fixture.homeTeamId)?.nameShort ?: "Local"
+        val awayName = teamDao.byId(fixture.awayTeamId)?.nameShort ?: "Visitante"
+        val redCards = result.events.count { it.type == EventType.RED_CARD }
+        val injuries = result.events.count { it.type == EventType.INJURY }
+        val varDisallowed = result.varDisallowedHome + result.varDisallowedAway
+        val teamId = when {
+            fixture.homeTeamId == managerTeamId -> managerTeamId
+            fixture.awayTeamId == managerTeamId -> managerTeamId
+            else -> -1
+        }
+        val details = buildString {
+            append("$homeName ${result.homeGoals}-${result.awayGoals} $awayName.")
+            if (varDisallowed > 0) append(" VAR: $varDisallowed gol(es) anulados.")
+            if (redCards > 0) append(" Rojas: $redCards.")
+            if (injuries > 0) append(" Lesiones: $injuries.")
+            append(" +${result.addedTimeSecondHalf} de añadido final.")
+        }
+        newsDao.insert(
+            NewsEntity(
+                date = java.time.LocalDate.now().toString(),
+                matchday = matchday,
+                category = "RESULT",
+                titleEs = "J$matchday: $homeName ${result.homeGoals}-${result.awayGoals} $awayName",
+                bodyEs = details,
+                teamId = teamId,
+            )
+        )
     }
 }
