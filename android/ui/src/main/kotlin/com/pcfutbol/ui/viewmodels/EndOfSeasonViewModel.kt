@@ -20,6 +20,7 @@ data class EndOfSeasonUiState(
     val loading: Boolean = true,
     val applied: Boolean = false,
     val nextSeasonReady: Boolean = false,
+    val nextRouteOffers: Boolean = false,
     val error: String? = null,
 )
 
@@ -67,7 +68,8 @@ class EndOfSeasonViewModel @Inject constructor(
                 // Registrar resultado de temporada en ProManager (si aplica)
                 val summary = _uiState.value.summary
                 val state = seasonStateDao.get()
-                if (summary != null && state?.isProManagerMode() == true && state.managerTeamId > 0) {
+                val isProManager = state?.isProManagerMode() == true
+                if (summary != null && state != null && state.isProManagerMode() && state.managerTeamId > 0) {
                     proManagerRepository.recordSeasonEnd(
                         managerId      = proManagerRepository.managerIdForTeam(state.managerTeamId),
                         teamId         = state.managerTeamId,
@@ -77,9 +79,19 @@ class EndOfSeasonViewModel @Inject constructor(
                 }
 
                 endOfSeasonUseCase.advanceToNextSeason()
+                if (isProManager) {
+                    val updated = seasonStateDao.get()
+                    if (updated != null) {
+                        seasonStateDao.update(updated.copy(managerTeamId = -1))
+                    }
+                }
                 competitionRepository.setupAllLeagues()
-            }.onSuccess {
-                _uiState.value = _uiState.value.copy(nextSeasonReady = true)
+                isProManager
+            }.onSuccess { goToOffers ->
+                _uiState.value = _uiState.value.copy(
+                    nextSeasonReady = true,
+                    nextRouteOffers = goToOffers,
+                )
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(error = e.message)
             }

@@ -23,7 +23,7 @@ import com.pcfutbol.ui.viewmodels.EndOfSeasonViewModel
 
 @Composable
 fun EndOfSeasonScreen(
-    onNextSeason: () -> Unit,
+    onNextSeason: (Boolean) -> Unit,
     vm: EndOfSeasonViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsState()
@@ -36,8 +36,8 @@ fun EndOfSeasonScreen(
     }
 
     // Navigate when next season is ready
-    LaunchedEffect(state.nextSeasonReady) {
-        if (state.nextSeasonReady) onNextSeason()
+    LaunchedEffect(state.nextSeasonReady, state.nextRouteOffers) {
+        if (state.nextSeasonReady) onNextSeason(state.nextRouteOffers)
     }
 
     Column(

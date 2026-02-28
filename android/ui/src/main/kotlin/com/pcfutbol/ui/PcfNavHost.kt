@@ -143,8 +143,9 @@ fun PcfNavHost() {
 
         composable(Routes.END_OF_SEASON) {
             EndOfSeasonScreen(
-                onNextSeason = {
-                    navController.navigate(Routes.LIGA_SELECT) {
+                onNextSeason = { goToOffers ->
+                    val target = if (goToOffers) Routes.PROMANAGER_OFFERS else Routes.LIGA_SELECT
+                    navController.navigate(target) {
                         popUpTo(Routes.MAIN_MENU)
                     }
                 },
