@@ -30,7 +30,7 @@ if sys.platform == "win32":
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "android" / "core" / "data" / "src" / "main" / "assets"
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "android" / "core" / "data" / "src" / "main" / "assets"
 PLAYERS_CSV  = ASSETS_DIR / "pcf55_players_2526.csv"
 TEAMS_JSON   = ASSETS_DIR / "pcf55_teams_extracted.json"
 
@@ -145,7 +145,7 @@ class MatchResult:
 # ---------------------------------------------------------------------------
 
 def load_teams() -> dict[str, Team]:
-    """Carga equipos de LIGA1 y LIGA2 del CSV de jugadores."""
+    """Carga equipos de LIGA1, LIGA2 y 1ª RFEF del CSV de jugadores."""
     teams: dict[str, Team] = {}  # key = slot_id str
     players_by_team: dict[str, list[Player]] = {}
 
@@ -157,7 +157,7 @@ def load_teams() -> dict[str, Team]:
         reader = csv.DictReader(f)
         for row in reader:
             comp = row["competition"]
-            if comp not in ("ES1", "ES2"):
+            if comp not in ("ES1", "ES2", "E3G1", "E3G2"):
                 continue
             slot = int(row["teamSlotId"])
             key  = str(slot)
@@ -618,6 +618,92 @@ def menu_team_strength(liga1: list[Team], liga2: list[Team]):
     print()
 
 
+REAL_LEAGUES = [
+    ("Spanish La Liga",            4335, "LIGA1"),
+    ("Spanish La Liga 2",          4400, "LIGA2"),
+    ("English Premier League",     4328, "PRML"),
+    ("Italian Serie A",            4332, "SERIA"),
+    ("French Ligue 1",             4334, "LIG1"),
+    ("German Bundesliga",          4331, "BUN1"),
+    ("Dutch Eredivisie",           4337, "ERED"),
+    ("Portuguese Primeira Liga",   4344, "PRIM"),
+    ("Belgian Pro League",         4338, "BELGA"),
+    ("Turkish Super Lig",          4339, "SUPERL"),
+    ("Scottish Premiership",       4330, "SCOT"),
+    ("Russian Premier League",     4355, "RPL"),
+    ("Danish Superliga",           4340, "DSL"),
+    ("Polish Ekstraklasa",         4422, "EKSTR"),
+    ("Austrian Bundesliga",        4621, "ABUND"),
+    ("Argentine Primera Division", 4406, "ARGPD"),
+    ("Brazilian Serie A",          4351, "BRASEA"),
+    ("Mexican Liga MX",            4350, "LIGAMX"),
+    ("Saudi Pro League",           4668, "SPL"),
+]
+
+
+def menu_real_football() -> None:
+    """Muestra clasificacion y resultados reales de cualquier liga via TheSportsDB."""
+    import urllib.request
+    import json
+
+    BASE = "https://www.thesportsdb.com/api/v1/json/3"
+
+    while True:
+        print(_c(CYAN, "\n=== ACTUALIDAD FUTBOLISTICA ==="))
+        for i, (name, _, code) in enumerate(REAL_LEAGUES, 1):
+            print(f"  {i:>2}. {name} ({code})")
+        print("   0. Volver")
+
+        op = input_int("  Liga: ", 0, len(REAL_LEAGUES))
+        if op == 0:
+            return
+
+        name, league_id, _ = REAL_LEAGUES[op - 1]
+        print(_c(YELLOW, f"\n  {name}"))
+        print("  1. Clasificacion")
+        print("  2. Ultimos resultados")
+        sub = input_int("  Opcion: ", 1, 2)
+
+        try:
+            if sub == 1:
+                url = f"{BASE}/lookuptable.php?l={league_id}&s=2024-2025"
+                with urllib.request.urlopen(url, timeout=8) as r:
+                    data = json.loads(r.read())
+                rows = data.get("table") or []
+                if not rows:
+                    print(_c(RED, "  Sin datos para esta liga."))
+                else:
+                    print(f"\n{'Pos':<4} {'Equipo':<28} {'PJ':>3} {'G':>3} {'E':>3} {'P':>3} {'GF':>4} {'GC':>4} {'Pts':>4}")
+                    print("-" * 58)
+                    for i, row in enumerate(rows, 1):
+                        print(
+                            f"{i:<4} {row.get('name', '')[:27]:<28} "
+                            f"{row.get('played', '')!s:>3} {row.get('win', '')!s:>3} "
+                            f"{row.get('draw', '')!s:>3} {row.get('loss', '')!s:>3} "
+                            f"{row.get('goalsfor', '')!s:>4} {row.get('goalsagainst', '')!s:>4} "
+                            f"{row.get('total', '')!s:>4}"
+                        )
+            else:
+                url = f"{BASE}/eventspastleague.php?id={league_id}"
+                with urllib.request.urlopen(url, timeout=8) as r:
+                    data = json.loads(r.read())
+                events = (data.get("events") or [])[-15:][::-1]
+                if not events:
+                    print(_c(RED, "  Sin resultados disponibles."))
+                else:
+                    print()
+                    for ev in events:
+                        hs = ev.get("intHomeScore") or "-"
+                        aws = ev.get("intAwayScore") or "-"
+                        home = ev.get("strHomeTeam", "")[:22]
+                        away = ev.get("strAwayTeam", "")[:22]
+                        date = ev.get("dateEvent", "")
+                        print(f"  {date}  {home:>22} {hs}-{aws}  {away}")
+        except Exception as e:
+            print(_c(RED, f"  Error de conexion: {e}"))
+
+        _pause()
+
 # ===========================================================================
 # PRO MANAGER — MODO CARRERA
 # ===========================================================================
@@ -632,6 +718,36 @@ def _prestige_label(p: int) -> str:
 def _pause():
     if sys.stdin.isatty():
         input(_c(GRAY, "  [ENTER para continuar]"))
+
+
+def _print_career_summary(data: dict):
+    manager = data.get("manager", {})
+    history = manager.get("history", [])
+    if not isinstance(history, list) or not history:
+        return
+
+    print()
+    print(_c(BOLD + YELLOW, "  ═══ RESUMEN DE CARRERA ═══"))
+    print(
+        _c(
+            GRAY,
+            f"  Manager: {manager.get('name', '?')}  |  "
+            f"Temporadas: {len(history)}  |  Prestigio: {_prestige_label(int(manager.get('prestige', 1)))}",
+        )
+    )
+    for h in history[-8:]:
+        season = h.get("season", "?")
+        team = h.get("team", "?")
+        comp = str(h.get("comp", "?"))
+        pos = h.get("position", "?")
+        met = bool(h.get("met", False))
+        if "Segunda" in comp and isinstance(pos, int) and pos <= 3:
+            outcome = "✓ ascenso"
+        else:
+            outcome = "✓ objetivo" if met else "✗ objetivo"
+        comp_short = "1ª" if "Primera" in comp else ("2ª" if "Segunda" in comp else comp[:2])
+        print(f"  {season}: {team:<16} {comp_short:<2}  Pos {pos:<2}  {outcome}")
+    print()
 
 
 # ---- Save / Load -----------------------------------------------------------
@@ -649,6 +765,183 @@ def _load_career() -> Optional[dict]:
             return json.load(f)
     except Exception:
         return None
+
+
+def _season_year(season: str) -> int:
+    try:
+        return int(str(season).split("-")[0])
+    except Exception:
+        return 2025
+
+
+def _player_snapshot_from_team_player(player: Player, team: Team, season_year: int) -> dict:
+    birth_year = season_year - max(player.age, 15)
+    return {
+        "name": player.name,
+        "position": player.position,
+        "birth_year": birth_year,
+        "me": player.me,
+        "ve": player.ve,
+        "re": player.re,
+        "ag": player.ag,
+        "ca": player.ca,
+        "remate": player.remate,
+        "regate": player.regate,
+        "pase": player.pase,
+        "tiro": player.tiro,
+        "entrada": player.entrada,
+        "portero": player.portero,
+        "market_value": player.market_value,
+        "team_slot_id": team.slot_id,
+        "status": "OK",
+    }
+
+
+def _build_players_snapshot(liga1: list[Team], liga2: list[Team], season: str) -> list[dict]:
+    season_year = _season_year(season)
+    players: list[dict] = []
+    for team in liga1 + liga2:
+        for player in team.players:
+            players.append(_player_snapshot_from_team_player(player, team, season_year))
+    return players
+
+
+def _format_attr_delta(delta: int, attr: str) -> str:
+    label = {"me": "ME", "ve": "VE", "re": "RE", "ca": "CA", "ag": "AG"}.get(attr, attr.upper())
+    return f"{delta:+d} {label}"
+
+
+def _print_development_summary(summary: dict):
+    improved = summary.get("improved", [])
+    declined = summary.get("declined", [])
+    retired = summary.get("retired", [])
+    youth_added = int(summary.get("youth_added", 0))
+
+    print()
+    print(_c(BOLD + YELLOW, "  ═══ EVOLUCION DE TU PLANTILLA ═══"))
+    print(f"  MEJORAN:  {', '.join(improved[:4]) if improved else 'Sin cambios destacados'}")
+    print(f"  BAJAN:    {', '.join(declined[:4]) if declined else 'Sin bajadas destacadas'}")
+    print(f"  RETIRAN:  {', '.join(retired[:4]) if retired else 'Ningun jugador se retira'}")
+    print(f"  CANTERANOS: {youth_added} jovenes (17 anos) suben al primer equipo")
+    print()
+
+
+def _apply_season_development(data: dict) -> dict:
+    """Aplica evolucion/retiro de jugadores tras fin de temporada y devuelve resumen."""
+    players = data.get("players", [])
+    if not isinstance(players, list):
+        return {"improved": [], "declined": [], "retired": [], "youth_added": 0}
+
+    season_str = str(data.get("season", "2025-26"))
+    year = _season_year(season_str)
+    season_hash = sum((i + 1) * ord(ch) for i, ch in enumerate(season_str))
+    seed = int(data.get("season_seed", 0)) ^ season_hash
+    rng = random.Random(seed)
+    attrs = ["ve", "re", "ag", "ca", "remate", "regate", "pase", "tiro", "entrada", "portero"]
+
+    manager_slot = int(data.get("team_slot", -1))
+    improved: list[str] = []
+    declined: list[str] = []
+    retired: list[str] = []
+
+    retired_now = 0
+    for p in players:
+        if not isinstance(p, dict):
+            continue
+
+        birth_year = int(p.get("birth_year", year - 22))
+        age = year - birth_year
+        is_manager_player = int(p.get("team_slot_id", -1)) == manager_slot
+        before = {
+            "me": int(p.get("me", 50)),
+            "ve": int(p.get("ve", 50)),
+            "re": int(p.get("re", 50)),
+            "ca": int(p.get("ca", 50)),
+            "ag": int(p.get("ag", 50)),
+        }
+
+        will_retire = age >= 37 or (age >= 35 and int(p.get("ve", 50)) <= 30)
+        if will_retire:
+            if p.get("status") != "RETIRED":
+                retired_now += 1
+                if is_manager_player:
+                    retired.append(f"{p.get('name', 'Jugador')} ({age} anos)")
+            p["status"] = "RETIRED"
+            continue
+
+        if age < 24:
+            improve_count = rng.randint(1, 3)
+            gain = 0
+            for attr in rng.sample(attrs, k=improve_count):
+                inc = rng.randint(1, 3)
+                p[attr] = min(99, int(p.get(attr, 50)) + inc)
+                gain += inc
+            p["me"] = min(99, int(p.get("me", 50)) + max(1, round(gain / max(1, improve_count))))
+        elif age >= 31:
+            delta = 2 if age >= 34 else 1
+            p["ve"] = max(1, int(p.get("ve", 50)) - delta)
+            p["re"] = max(1, int(p.get("re", 50)) - delta)
+            p["me"] = max(1, int(p.get("me", 50)) - (1 if age >= 34 else 0))
+        else:
+            for attr in rng.sample(attrs, k=rng.randint(0, 2)):
+                p[attr] = max(0, min(99, int(p.get(attr, 50)) + rng.randint(-1, 1)))
+            p["me"] = max(1, min(99, int(p.get("me", 50)) + rng.randint(-1, 1)))
+
+        if not is_manager_player:
+            continue
+
+        after = {
+            "me": int(p.get("me", 50)),
+            "ve": int(p.get("ve", 50)),
+            "re": int(p.get("re", 50)),
+            "ca": int(p.get("ca", 50)),
+            "ag": int(p.get("ag", 50)),
+        }
+        deltas = {k: after[k] - before[k] for k in before}
+        pos_changes = [(k, v) for k, v in deltas.items() if v > 0]
+        neg_changes = [(k, v) for k, v in deltas.items() if v < 0]
+        player_name = str(p.get("name", "Jugador"))
+        if pos_changes:
+            attr, delta = max(pos_changes, key=lambda item: item[1])
+            improved.append(f"{player_name} ({_format_attr_delta(delta, attr)})")
+        if neg_changes:
+            attr, delta = min(neg_changes, key=lambda item: item[1])
+            veteran_note = f" - veterano {age} anos" if age >= 33 else ""
+            declined.append(f"{player_name} ({_format_attr_delta(delta, attr)}){veteran_note}")
+
+    youth_added = 0
+    if manager_slot > 0:
+        for _ in range(2):
+            players.append({
+                "name": f"Cantera {rng.randint(100, 999)}",
+                "position": rng.choice(["Defender", "Midfielder", "Forward"]),
+                "birth_year": year - 17,
+                "me": rng.randint(42, 55),
+                "ve": rng.randint(35, 50),
+                "re": rng.randint(35, 50),
+                "ag": rng.randint(30, 55),
+                "ca": rng.randint(35, 55),
+                "remate": rng.randint(20, 45),
+                "regate": rng.randint(20, 45),
+                "pase": rng.randint(25, 50),
+                "tiro": rng.randint(20, 45),
+                "entrada": rng.randint(25, 50),
+                "portero": 0,
+                "team_slot_id": manager_slot,
+                "status": "OK",
+                "market_value": rng.randint(100_000, 600_000),
+            })
+            youth_added += 1
+
+    data["players"] = [p for p in players if isinstance(p, dict) and p.get("status") != "RETIRED"]
+    data["retired_count"] = int(data.get("retired_count", 0)) + retired_now
+
+    return {
+        "improved": improved,
+        "declined": declined,
+        "retired": retired,
+        "youth_added": youth_added,
+    }
 
 
 # ---- Standings from saved results ------------------------------------------
@@ -671,14 +964,52 @@ def _standings_from_results(results: list[dict], teams_by_slot: dict[int, Team])
 
 # ---- Offer pool ------------------------------------------------------------
 
-def _generate_offers(prestige: int, liga1: list[Team], liga2: list[Team]) -> list[Team]:
+def _generate_offers(prestige: int, liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] = [], data: Optional[dict] = None) -> list[Team]:
+    l_rfef = sorted(liga_rfef, key=lambda t: t.strength())
     l2 = sorted(liga2, key=lambda t: t.strength())
     l1 = sorted(liga1, key=lambda t: t.strength())
-    if prestige <= 2:   pool = l2[:12]
-    elif prestige <= 4: pool = list(l2)
-    elif prestige <= 6: pool = l2[-8:] + l1[:8]
-    elif prestige <= 8: pool = l1[:15]
-    else:               pool = list(l1)
+    pool: list[Team] = []
+
+    manager = (data or {}).get("manager", {})
+    history = manager.get("history", []) if isinstance(manager, dict) else []
+    last = history[-1] if isinstance(history, list) and history else {}
+    last_comp = str(last.get("comp", ""))
+    last_pos = int(last.get("position", 999)) if isinstance(last.get("position", None), int) else 999
+    team_slot = int((data or {}).get("team_slot", -1))
+    was_promoted_rfef = "RFEF" in last_comp and last_pos <= 3
+    was_promoted = "Segunda" in last_comp and last_pos <= 3
+    stayed_segunda = "Segunda" in last_comp and not was_promoted
+
+    if was_promoted and prestige >= 3:
+        pool = l1[:16]
+    elif was_promoted_rfef or (stayed_segunda is False and prestige == 2):
+        pool = l2[:12]
+    elif stayed_segunda:
+        idx = next((i for i, t in enumerate(l2) if t.slot_id == team_slot), len(l2) // 2)
+        similar = l2[max(0, idx - 4): min(len(l2), idx + 5)]
+        better = l2[max(0, idx + 1): min(len(l2), idx + 5)]
+        pool = similar + better + l1[:2]
+    elif prestige == 1:
+        pool = l_rfef if l_rfef else l2[:8]
+    elif prestige <= 2:
+        pool = l2[:12]
+    elif prestige <= 4:
+        pool = list(l2)
+    elif prestige <= 6:
+        pool = l2[-8:] + l1[:8]
+    elif prestige <= 8:
+        pool = l1[:15]
+    else:
+        pool = list(l1)
+
+    uniq: list[Team] = []
+    seen: set[int] = set()
+    for t in pool:
+        if t.slot_id in seen:
+            continue
+        uniq.append(t)
+        seen.add(t.slot_id)
+    pool = uniq
     random.shuffle(pool)
     return pool[:4] if len(pool) >= 4 else pool
 
@@ -686,29 +1017,35 @@ def _generate_offers(prestige: int, liga1: list[Team], liga2: list[Team]) -> lis
 # ---- Objectives ------------------------------------------------------------
 
 def _assign_objective(team: Team, liga1: list[Team], liga2: list[Team]) -> str:
-    if team.comp == "ES2":
-        rank = sorted(liga2, key=lambda t: t.strength(), reverse=True)
-        idx  = next((i for i, t in enumerate(rank) if t.slot_id == team.slot_id), 15)
-        if idx < 3:    return "ASCENDER A PRIMERA DIVISION"
-        elif idx < 12: return "CLASIFICACION TOP 10"
-        else:           return "EVITAR EL DESCENSO"
-    else:
-        rank = sorted(liga1, key=lambda t: t.strength(), reverse=True)
-        idx  = next((i for i, t in enumerate(rank) if t.slot_id == team.slot_id), 12)
-        if idx < 3:    return "GANAR EL TITULO"
-        elif idx < 7:  return "CLASIFICACION PARA EUROPA"
-        elif idx < 12: return "QUEDAR EN LA MITAD SUPERIOR"
-        else:           return "EVITAR EL DESCENSO"
+    rank = sorted((liga2 if team.comp == "ES2" else liga1), key=lambda t: t.strength(), reverse=True)
+    total = len(rank)
+    idx = next((i for i, t in enumerate(rank) if t.slot_id == team.slot_id), total // 2)
+    pos = idx + 1
+    direct_bottom = 6 if total >= 22 else 4
+    direct_start = max(1, total - direct_bottom + 1)
+
+    if pos <= 3:
+        return "GANAR LA LIGA"
+    if pos <= 10:
+        return "CLASIFICACION TOP 10"
+    if pos >= direct_start:
+        return "EVITAR EL DESCENSO DIRECTO"
+    return "EVITAR EL DESCENSO"
 
 
 def _check_objective(objective: str, position: int, total: int, comp: str) -> bool:
     o = objective.upper()
-    if "DESCENSO" in o: return position <= (total - 4 if comp == "ES2" else total - 3)
+    direct_bottom = 6 if total >= 22 else 4
+    safe_limit = total - direct_bottom
+    if "DESCENSO DIRECTO" in o:
+        return position <= safe_limit
+    if "DESCENSO" in o:
+        return position <= safe_limit
     elif "ASCENDER" in o: return position <= 3
     elif "TOP 10"   in o: return position <= 10
     elif "MITAD"    in o: return position <= total // 2
     elif "EUROPA"   in o: return position <= 6
-    elif "TITULO"   in o or "GANAR" in o: return position == 1
+    elif "LIGA"     in o or "TITULO" in o or "GANAR" in o: return position == 1
     return False
 
 
@@ -792,8 +1129,82 @@ def _news_item(r: dict, tbs: dict[int, Team], mgr_slot: int,
         return f"Derrota {venue} ante {oname} ({mg}-{og}).{extra}"
 
 
+def _pick_player_name(team: Team, rng: random.Random, prefer_attack: bool = False) -> str:
+    if not team.players:
+        return "Jugador"
+    if prefer_attack:
+        attackers = [
+            p for p in team.players
+            if ("Forward" in p.position or "Winger" in p.position or "Attacker" in p.position)
+        ]
+        if attackers:
+            return rng.choice(attackers).name
+    return rng.choice(team.players).name
+
+
+def _append_dynamic_news(
+    news: list[str],
+    md: int,
+    md_res: list[dict],
+    tbs: dict[int, Team],
+    mgr_slot: int,
+    mgr_team: Team,
+    mgr_name: str,
+    standings: list[Standing],
+    n_rel: int,
+) -> list[str]:
+    total = len(standings)
+    mgr_pos = next((i + 1 for i, s in enumerate(standings) if s.team.slot_id == mgr_slot), 0)
+    my_r = next((r for r in md_res if r["h"] == mgr_slot or r["a"] == mgr_slot), None)
+    noise = sum((r["h"] * 31 + r["a"] * 17 + r["hg"] * 7 + r["ag"]) for r in md_res) if md_res else 0
+    rng = random.Random(md * 1315423911 ^ mgr_slot ^ noise)
+
+    candidates: list[str] = []
+    if my_r:
+        candidates.append(_news_item(my_r, tbs, mgr_slot, mgr_name, mgr_pos, total, n_rel))
+
+    striker = _pick_player_name(mgr_team, rng, prefer_attack=True)
+    candidates.append(f"Tu delantero {striker} ha marcado 2 goles - forma al maximo.")
+
+    injured = _pick_player_name(mgr_team, rng)
+    weeks = rng.randint(2, 4)
+    candidates.append(f"Lesion de {injured} - baja {weeks} semanas.")
+
+    if mgr_pos:
+        if mgr_pos <= max(3, total // 4):
+            candidates.append(f"La junta esta satisfecha con tu rendimiento (pos {mgr_pos}ª).")
+        elif mgr_pos > total - n_rel:
+            candidates.append(f"La junta exige reaccion inmediata (pos {mgr_pos}ª).")
+        else:
+            candidates.append(f"La junta mantiene la calma con tu rendimiento (pos {mgr_pos}ª).")
+
+    rivals = [t for sid, t in tbs.items() if sid != mgr_slot]
+    if rivals:
+        rival = rng.choice(rivals)
+        fichaje = _pick_player_name(rival, rng, prefer_attack=True)
+        fee = rng.randint(1, 8)
+        candidates.append(f"Rival {rival.name} acaba de fichar a {fichaje} por {fee}M€.")
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for item in candidates:
+        if item in seen:
+            continue
+        unique.append(item)
+        seen.add(item)
+
+    if not unique:
+        return []
+    rng.shuffle(unique)
+    take = 2 if len(unique) > 1 and rng.random() < 0.65 else 1
+    selected = unique[:take]
+    for item in selected:
+        news.append(f"J{md}: {item}")
+    return selected
+
+
 def _season_end_screen(data: dict, standings: list[Standing], mgr_slot: int,
-                        mgr_team: Team, is_l1: bool, n_rel: int):
+                        mgr_team: Team, is_l1: bool, n_rel: int) -> bool:
     comp_name = "Primera División" if is_l1 else "Segunda División"
     total     = len(standings)
     mgr_pos   = next((i+1 for i, s in enumerate(standings) if s.team.slot_id == mgr_slot), 0)
@@ -842,9 +1253,17 @@ def _season_end_screen(data: dict, standings: list[Standing], mgr_slot: int,
         "objective": data["objective"],
         "met":       met,
     })
+    dev_summary = _apply_season_development(data)
+    _print_development_summary(dev_summary)
     data["phase"] = "POSTSEASON"
     _save_career(data)
-    _pause()
+    print(_c(CYAN, "  1. Continuar carrera"))
+    print(_c(CYAN, "  2. Salir al menu principal"))
+    op = input_int("  Opcion: ", 1, 2)
+    keep_playing = op == 1
+    data["continue_career_next"] = keep_playing
+    _save_career(data)
+    return keep_playing
 
 
 # ---- Tactics ---------------------------------------------------------------
@@ -1506,23 +1925,224 @@ def _market_menu(data: dict, mgr_team: Team, all_slots: dict[int, Team],
             print_squad(mgr_team)
 
 
+def _winter_market_menu(data: dict, mgr_team: Team, comp_teams: list[Team], md: int):
+    print(_c(BOLD + YELLOW, "\n  ═══ VENTANA DE MERCADO DE INVIERNO ═══"))
+    ans = input_str("  ¿Quieres fichar algún jugador? (S/N): ").strip().upper()
+    if not ans.startswith("S"):
+        print(_c(GRAY, "  Continúa la temporada sin movimientos.\n"))
+        return
+
+    budget = int(data.get("budget", 0))
+    mgr_names = {p.name for p in mgr_team.players}
+    pool: list[tuple[Team, Player]] = [
+        (t, p)
+        for t in comp_teams
+        if t.slot_id != mgr_team.slot_id
+        for p in t.players
+        if p.name not in mgr_names
+    ]
+    if not pool:
+        print(_c(GRAY, "  No hay jugadores disponibles en esta ventana.\n"))
+        return
+
+    rng = random.Random(int(data.get("season_seed", 0)) ^ (md * 10007) ^ 0xA11CE)
+    picks = rng.sample(pool, k=min(3, len(pool)))
+    picks = sorted(picks, key=lambda item: item[1].overall, reverse=True)
+
+    print(_c(GRAY, f"\n  Presupuesto disponible: €{budget:,.0f}"))
+    print(_c(GRAY, f"  {'#':>3}  {'JUGADOR':<24} {'EQUIPO':<22} {'ME':>3} {'VALOR':<10}"))
+    print(_c(GRAY, "  " + "─" * 66))
+    for i, (team, player) in enumerate(picks, 1):
+        val = f"€{player.market_value/1e6:.1f}M" if player.market_value >= 1_000_000 else f"€{player.market_value//1000}K"
+        color = RESET if player.market_value <= budget else GRAY
+        print(color + f"  {i:>3}  {player.name[:23]:<24} {team.name[:21]:<22} {player.me:>3} {val:<10}" + RESET)
+    print()
+
+    idx = input_int(f"  Fichar (1-{len(picks)}, 0=cancelar): ", 0, len(picks))
+    if idx == 0:
+        print(_c(GRAY, "  Operación cancelada.\n"))
+        return
+    src_team, player = picks[idx - 1]
+    fee = int(player.market_value)
+    if fee > budget:
+        print(_c(RED, f"  Sin presupuesto (necesitas €{fee:,.0f}, tienes €{budget:,.0f}).\n"))
+        return
+
+    if input_int("  1. Confirmar fichaje  0. Cancelar: ", 0, 1) == 0:
+        print(_c(GRAY, "  Operación cancelada.\n"))
+        return
+
+    data["budget"] = budget - fee
+    data.setdefault("bought", []).append({
+        "player_name": player.name,
+        "from_slot": src_team.slot_id,
+        "paid": fee,
+    })
+    src_team.players = [p for p in src_team.players if p.name != player.name]
+    mgr_team.players.append(player)
+    _save_career(data)
+    print(_c(GREEN, f"  ✓ {player.name} fichado por €{fee:,.0f}. Presupuesto: €{data['budget']:,.0f}\n"))
+
+
+def _init_copa_state(data: dict, liga1: list[Team], liga2: list[Team]) -> dict:
+    top_l1 = sorted(liga1, key=lambda t: t.strength(), reverse=True)[:8]
+    top_l2 = sorted(liga2, key=lambda t: t.strength(), reverse=True)[:8]
+    participants = top_l1 + top_l2
+    rng = random.Random(int(data.get("season_seed", 0)) ^ 0xC0FA)
+    rng.shuffle(participants)
+    return {
+        "season": data.get("season"),
+        "alive": [t.slot_id for t in participants],
+        "round_index": 0,
+        "rounds": [],
+        "champion": None,
+        "matchdays": [10, 20, 30, 38],
+        "round_labels": ["OCTAVOS", "CUARTOS", "SEMIFINAL", "FINAL"],
+    }
+
+
+def _active_copa_round_label(copa: dict, md: int) -> str:
+    if not isinstance(copa, dict):
+        return ""
+    idx = int(copa.get("round_index", 0))
+    mds = copa.get("matchdays", [])
+    labels = copa.get("round_labels", [])
+    if idx < len(mds) and idx < len(labels) and md == int(mds[idx]):
+        return str(labels[idx])
+    return ""
+
+
+def _play_copa_round(
+    data: dict,
+    md: int,
+    teams_by_slot: dict[int, Team],
+    mgr_slot: int,
+    show_output: bool = False,
+) -> list[dict]:
+    copa = data.get("copa")
+    if not isinstance(copa, dict):
+        return []
+    idx = int(copa.get("round_index", 0))
+    matchdays = copa.get("matchdays", [])
+    labels = copa.get("round_labels", [])
+    if idx >= len(matchdays) or idx >= len(labels) or md != int(matchdays[idx]):
+        return []
+
+    alive = [sid for sid in copa.get("alive", []) if sid in teams_by_slot]
+    if len(alive) < 2:
+        return []
+
+    rng = random.Random(int(data.get("season_seed", 0)) ^ (md * 1597) ^ (idx * 8191))
+    rng.shuffle(alive)
+    winners: list[int] = []
+    matches: list[dict] = []
+    tactic = data.get("tactic")
+
+    for i in range(0, len(alive), 2):
+        if i + 1 >= len(alive):
+            winners.append(alive[i])
+            continue
+        hsid = alive[i]
+        asid = alive[i + 1]
+        home = teams_by_slot[hsid]
+        away = teams_by_slot[asid]
+        seed = int(data.get("season_seed", 0)) ^ (md * 7919 + hsid * 31 + asid * 17 + 0xC0FA)
+        ht = tactic if hsid == mgr_slot else None
+        at = tactic if asid == mgr_slot else None
+        hg, ag = simulate_match(home, away, seed, home_tactic=ht, away_tactic=at)
+
+        penalties = ""
+        if hg > ag:
+            winner = hsid
+        elif ag > hg:
+            winner = asid
+        else:
+            home_wins = rng.random() < 0.5
+            winner = hsid if home_wins else asid
+            penalties = f" (pen. {'5-4' if home_wins else '4-5'})"
+
+        winners.append(winner)
+        matches.append({
+            "home": hsid,
+            "away": asid,
+            "hg": hg,
+            "ag": ag,
+            "winner": winner,
+            "penalties": penalties,
+        })
+
+    label = str(labels[idx])
+    copa.setdefault("rounds", []).append({"md": md, "label": label, "matches": matches})
+    copa["alive"] = winners
+    copa["round_index"] = idx + 1
+    if len(winners) == 1:
+        copa["champion"] = winners[0]
+    data["copa"] = copa
+
+    if show_output and matches:
+        print(_c(BOLD + YELLOW, f"\n  ═══ COPA DEL REY · {label} ═══"))
+        for m in matches:
+            h = teams_by_slot[m["home"]].name
+            a = teams_by_slot[m["away"]].name
+            w = teams_by_slot[m["winner"]].name
+            print(f"  {h:<22} {m['hg']:>2} - {m['ag']:<2} {a}{m['penalties']}")
+            print(_c(GRAY, f"     Clasifica: {w}"))
+        print()
+
+    news = data.setdefault("news", [])
+    mgr_match = next((m for m in matches if m["home"] == mgr_slot or m["away"] == mgr_slot), None)
+    if mgr_match:
+        home_name = teams_by_slot[mgr_match["home"]].name
+        away_name = teams_by_slot[mgr_match["away"]].name
+        if mgr_match["winner"] == mgr_slot:
+            news.append(f"J{md}: Copa {label} - {home_name} {mgr_match['hg']}-{mgr_match['ag']} {away_name}. Sigues vivo.")
+        else:
+            news.append(f"J{md}: Copa {label} - {home_name} {mgr_match['hg']}-{mgr_match['ag']} {away_name}. Eliminado.")
+
+    if copa.get("champion") == mgr_slot:
+        news.append(f"J{md}: ¡Tu equipo gana la Copa del Rey!")
+
+    _save_career(data)
+    return matches
+
+
 # ---- Main season loop ------------------------------------------------------
 
-def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
-    is_l1     = data["competition"] == "ES1"
-    comp_t    = sorted(liga1 if is_l1 else liga2, key=lambda t: t.slot_id)
-    n_rel     = 3 if is_l1 else 4
-    tot_md    = 38 if is_l1 else 42
+def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] = []):
+    comp_key = data["competition"]
+    is_l1 = comp_key == "ES1"
+    is_l2 = comp_key == "ES2"
+    if is_l1:
+        comp_t = sorted(liga1, key=lambda t: t.slot_id)
+        n_rel = 3
+        tot_md = 38
+    elif is_l2:
+        comp_t = sorted(liga2, key=lambda t: t.slot_id)
+        n_rel = 4
+        tot_md = 42
+    else:
+        comp_t = sorted([t for t in liga_rfef if t.comp == comp_key], key=lambda t: t.slot_id)
+        if not comp_t:
+            comp_t = sorted(liga_rfef, key=lambda t: t.slot_id)
+        n_rel = 4
+        tot_md = 38
+    if not comp_t:
+        print(_c(RED, f"\n  No hay equipos cargados para la competicion {comp_key}."))
+        return
     fpm       = len(comp_t) // 2
     mgr_slot  = data["team_slot"]
     mgr_team  = {t.slot_id: t for t in comp_t}[mgr_slot]
     mgr_name  = data["manager"]["name"]
     seed      = data["season_seed"]
     tbs       = {t.slot_id: t for t in comp_t}   # teams_by_slot
-    all_slots = {t.slot_id: t for t in liga1 + liga2}
+    all_slots = {t.slot_id: t for t in liga1 + liga2 + liga_rfef}
 
     # Apply saved squad changes (fichajes/ventas)
     _apply_squad_changes(mgr_team, all_slots, data)
+    data.setdefault("players", _build_players_snapshot(liga1 + liga_rfef, liga2, data.get("season", "2025-26")))
+    if not isinstance(data.get("copa"), dict) or data.get("copa", {}).get("season") != data.get("season"):
+        data["copa"] = _init_copa_state(data, liga1, liga2)
+        _save_career(data)
 
     # Build fixture map (deterministic, sorted by slot_id)
     all_fix    = generate_fixtures(comp_t)
@@ -1545,6 +2165,10 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
             h, a = my_fix
             print(_c(CYAN, f"  PRÓXIMO PARTIDO — Jornada {cur_md}:"))
             print(_c(BOLD + YELLOW, f"  {h.name}  vs  {a.name}"))
+            print()
+        copa_label = _active_copa_round_label(data.get("copa", {}), cur_md)
+        if copa_label:
+            print(_c(BOLD + CYAN, f"  COPA DEL REY: {copa_label} (ronda activa)"))
             print()
 
         tactic  = data.setdefault("tactic", dict(DEFAULT_TACTIC))
@@ -1589,13 +2213,15 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
                 r  = {"md": cur_md, "h": h.slot_id, "a": a.slot_id, "hg": hg, "ag": ag}
                 md_res.append(r);  results.append(r)
             _show_md_results(md_res, tbs, mgr_slot)
-            my_r = next((r for r in md_res if r["h"] == mgr_slot or r["a"] == mgr_slot), None)
-            if my_r:
-                new_st  = _standings_from_results(results, tbs)
-                mgr_pos = next((i+1 for i, s in enumerate(new_st) if s.team.slot_id == mgr_slot), 0)
-                ni      = _news_item(my_r, tbs, mgr_slot, mgr_name, mgr_pos, len(new_st), n_rel)
-                news.append(f"J{cur_md}: {ni}")
-                print(_c(YELLOW, f"  📰 {ni}\n"))
+            new_st = _standings_from_results(results, tbs)
+            new_items = _append_dynamic_news(
+                news, cur_md, md_res, tbs, mgr_slot, mgr_team, mgr_name, new_st, n_rel
+            )
+            if new_items:
+                for ni in new_items:
+                    print(_c(YELLOW, f"  📰 {ni}"))
+                print()
+            _play_copa_round(data, cur_md, all_slots, mgr_slot, show_output=True)
             cur_md += 1
             data["current_matchday"] = cur_md
             _save_career(data)
@@ -1613,7 +2239,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
                 print(_c(GRAY, "  Sin noticias aún.\n"))
             else:
                 print(_c(YELLOW, "\n  ─── NOTICIAS ───"))
-                for ni in news[-12:]:
+                for ni in news[-5:]:
                     print(f"  • {ni}")
                 print()
 
@@ -1626,21 +2252,57 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
 
         elif op == 5:
             print(_c(YELLOW, f"\n  Simulando jornadas {cur_md}–{tot_md}..."))
+            winter_md = 21 if tot_md >= 42 else max(1, tot_md // 2)
             for md in range(cur_md, tot_md + 1):
+                md_res = []
                 for h, a in fix_by_md.get(md, []):
                     s  = seed ^ (md * 7919 + h.slot_id * 31 + a.slot_id)
                     ht = tactic if h.slot_id == mgr_slot else None
                     at = tactic if a.slot_id == mgr_slot else None
                     hg, ag = simulate_match(h, a, s, home_tactic=ht, away_tactic=at)
-                    results.append({"md": md, "h": h.slot_id, "a": a.slot_id, "hg": hg, "ag": ag})
+                    r = {"md": md, "h": h.slot_id, "a": a.slot_id, "hg": hg, "ag": ag}
+                    md_res.append(r)
+                    results.append(r)
+                _append_dynamic_news(
+                    news,
+                    md,
+                    md_res,
+                    tbs,
+                    mgr_slot,
+                    mgr_team,
+                    mgr_name,
+                    _standings_from_results(results, tbs),
+                    n_rel,
+                )
+                if md == winter_md and not data.get("winter_market_done", False):
+                    data["winter_market_done"] = True
+                    _save_career(data)
+                    _winter_market_menu(data, mgr_team, comp_t, md)
+                _play_copa_round(data, md, all_slots, mgr_slot, show_output=False)
             cur_md = tot_md + 1
             data["current_matchday"] = cur_md
             _save_career(data)
             print(_c(GREEN, "  ✓ Temporada completada.\n"))
             _pause()
 
-    _season_end_screen(data, _standings_from_results(results, tbs),
-                       mgr_slot, mgr_team, is_l1, n_rel)
+    continue_career = _season_end_screen(
+        data,
+        _standings_from_results(results, tbs),
+        mgr_slot,
+        mgr_team,
+        is_l1,
+        n_rel,
+    )
+    if not continue_career:
+        return
+
+    team = _show_offers(data, liga1, liga2, liga_rfef)
+    next_season = _next_season_str(data.get("season", "2025-26"))
+    _setup_season(data, team, liga1, liga2, next_season)
+    print(_c(GREEN, f"\n  ¡{data['manager']['name']} ficha por {team.name}!"))
+    print(_c(YELLOW, f"  Objetivo: {data['objective']}"))
+    _pause()
+    _season_loop(data, liga1, liga2, liga_rfef)
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -1667,20 +2329,29 @@ def _setup_season(data: dict, team: Team, liga1: list[Team], liga2: list[Team], 
         "budget":           _init_budget(team, liga1, liga2),
         "bought":           [],
         "sold":             [],
+        "winter_market_done": False,
         "results":          [],
         "news":             [f"Inicio de temporada {season}. {m['name']} llega a {team.name}."],
+        "manager_team":     {"slot_id": team.slot_id, "name": team.name},
+        "copa":             None,
     })
+    data.setdefault("players", _build_players_snapshot(liga1, liga2, season))
     _save_career(data)
 
 
-def _show_offers(data: dict, liga1: list[Team], liga2: list[Team]) -> Optional[Team]:
+def _comp_name(comp: str) -> str:
+    return {"ES1": "Primera División", "ES2": "Segunda División",
+            "E3G1": "1ª RFEF Grupo 1", "E3G2": "1ª RFEF Grupo 2"}.get(comp, comp)
+
+
+def _show_offers(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] = []) -> Optional[Team]:
     m      = data["manager"]
-    offers = _generate_offers(m["prestige"], liga1, liga2)
+    offers = _generate_offers(m["prestige"], liga1, liga2, liga_rfef, data=data)
     print(_c(BOLD + YELLOW, "\n  ═══ SELECCIÓN DE OFERTA ═══"))
     print(_c(GRAY,  f"  Prestigio: {_prestige_label(m['prestige'])}  |  Temporadas: {m['total_seasons']}"))
     print()
     for i, t in enumerate(offers, 1):
-        cn  = "Primera División" if t.comp == "ES1" else "Segunda División"
+        cn  = _comp_name(t.comp)
         obj = _assign_objective(t, liga1, liga2)
         print(_c(CYAN, f"  {i}. {t.name}"))
         print(f"       {cn}  ·  Fuerza: {t.strength():.1f}")
@@ -1692,7 +2363,7 @@ def _show_offers(data: dict, liga1: list[Team], liga2: list[Team]) -> Optional[T
 
 # ---- Entry point -----------------------------------------------------------
 
-def menu_promanager(liga1: list[Team], liga2: list[Team]):
+def menu_promanager(liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] = []):
     print(_c(BOLD + CYAN, "\n  ╔══════════════════════════════════╗"))
     print(_c(BOLD + CYAN, "  ║       MODO PRO MANAGER           ║"))
     print(_c(BOLD + CYAN, "  ╚══════════════════════════════════╝"))
@@ -1703,6 +2374,7 @@ def menu_promanager(liga1: list[Team], liga2: list[Team]):
         m = data["manager"]
         print(_c(YELLOW, f"\n  Partida guardada — {m['name']}  {_prestige_label(m['prestige'])}"))
         print(f"  {data.get('season','?')}  ·  {data.get('team_name','?')}  ·  J{data.get('current_matchday',1)}")
+        _print_career_summary(data)
         print()
         if data.get("phase") == "POSTSEASON":
             print(_c(CYAN, "  1. Nueva temporada (nuevas ofertas)"))
@@ -1712,12 +2384,12 @@ def menu_promanager(liga1: list[Team], liga2: list[Team]):
             if op == 0:
                 return
             elif op == 1:
-                team = _show_offers(data, liga1, liga2)
+                team = _show_offers(data, liga1, liga2, liga_rfef)
                 _setup_season(data, team, liga1, liga2, _next_season_str(data["season"]))
                 print(_c(GREEN,  f"\n  ¡{m['name']} ficha por {team.name}!"))
                 print(_c(YELLOW, f"  Objetivo: {data['objective']}"))
                 _pause()
-                _season_loop(data, liga1, liga2)
+                _season_loop(data, liga1, liga2, liga_rfef)
                 return
             else:
                 data = None
@@ -1729,7 +2401,7 @@ def menu_promanager(liga1: list[Team], liga2: list[Team]):
             if op == 0:
                 return
             elif op == 1:
-                _season_loop(data, liga1, liga2)
+                _season_loop(data, liga1, liga2, liga_rfef)
                 return
             else:
                 data = None
@@ -1741,13 +2413,22 @@ def menu_promanager(liga1: list[Team], liga2: list[Team]):
         return
     data = {"manager": {"name": name, "prestige": 1, "total_seasons": 0, "history": []}}
 
-    team = _show_offers(data, liga1, liga2)
+    team = _show_offers(data, liga1, liga2, liga_rfef)
     _setup_season(data, team, liga1, liga2, "2025-26")
     m = data["manager"]
     print(_c(GREEN,  f"\n  ¡Bienvenido a {team.name}, {m['name']}!"))
     print(_c(YELLOW, f"  Objetivo de la junta: {data['objective']}"))
     _pause()
-    _season_loop(data, liga1, liga2)
+    _season_loop(data, liga1, liga2, liga_rfef)
+
+
+def menu_multiplayer():
+    print(_c(BOLD + CYAN, "\n  ╔══════════════════════════════════╗"))
+    print(_c(BOLD + CYAN, "  ║      MULTIJUGADOR POR TURNOS     ║"))
+    print(_c(BOLD + CYAN, "  ╚══════════════════════════════════╝"))
+    print(_c(YELLOW, "\n  Esta variante del CLI no incluye multijugador por turnos."))
+    print(_c(GRAY,   "  Usa android/cli/pcfutbol_cli.py para jugar en modo multi.\n"))
+    _pause()
 
 
 # ===========================================================================
@@ -1765,10 +2446,12 @@ def main_menu():
 
     liga1 = sorted([t for t in all_teams.values() if t.comp == "ES1"], key=lambda t: t.name)
     liga2 = sorted([t for t in all_teams.values() if t.comp == "ES2"], key=lambda t: t.name)
+    liga_rfef = sorted([t for t in all_teams.values() if t.comp in ("E3G1", "E3G2")], key=lambda t: t.name)
 
     print(_c(GREEN, f"  ✓ {len(liga1)} equipos en Primera División"))
     print(_c(GREEN, f"  ✓ {len(liga2)} equipos en Segunda División"))
-    total_players = sum(len(t.players) for t in liga1 + liga2)
+    print(_c(GREEN, f"  ✓ {len(liga_rfef)} equipos en 1ª RFEF"))
+    total_players = sum(len(t.players) for t in liga1 + liga2 + liga_rfef)
     print(_c(GREEN, f"  ✓ {total_players} jugadores cargados\n"))
 
     while True:
@@ -1781,10 +2464,12 @@ def main_menu():
         print(_c(CYAN,   "  │  4. Top jugadores                │"))
         print(_c(CYAN,   "  │  5. Ranking de fortaleza         │"))
         print(_c(BOLD + CYAN, "  │  6. PRO MANAGER (modo carrera)  │"))
+        print(_c(BOLD + CYAN, "  │  7. MULTIJUGADOR por turnos     │"))
+        print(_c(BOLD + CYAN, "  │  8. Actualidad futbolistica      │"))
         print(_c(CYAN,   "  │  0. Salir                        │"))
         print(_c(CYAN,   "  └──────────────────────────────────┘"))
 
-        op = input_int("  Opción: ", 0, 6)
+        op = input_int("  Opción: ", 0, 8)
         if op == 0:
             print(_c(GRAY, "\n  ¡Hasta la próxima temporada!\n"))
             break
@@ -1799,7 +2484,11 @@ def main_menu():
         elif op == 5:
             menu_team_strength(liga1, liga2)
         elif op == 6:
-            menu_promanager(liga1, liga2)
+            menu_promanager(liga1, liga2, liga_rfef)
+        elif op == 7:
+            menu_multiplayer()
+        elif op == 8:
+            menu_real_football()
 
 
 if __name__ == "__main__":
