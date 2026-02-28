@@ -44,6 +44,21 @@ interface PlayerDao {
     @Query("SELECT * FROM players WHERE teamSlotId IS NULL ORDER BY ca DESC")
     fun freeAgents(): Flow<List<PlayerEntity>>
 
+    @Query("SELECT * FROM players WHERE teamSlotId IS NULL ORDER BY ca DESC LIMIT :limit")
+    suspend fun freeAgentsNow(limit: Int = 400): List<PlayerEntity>
+
+    @Query(
+        """
+        SELECT * FROM players
+        WHERE teamSlotId IS NOT NULL
+          AND teamSlotId != :managerTeamId
+          AND status = 0
+        ORDER BY ca DESC, nameShort ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun transferTargetsNow(managerTeamId: Int, limit: Int = 800): List<PlayerEntity>
+
     @Query("SELECT * FROM players WHERE id = :id")
     suspend fun byId(id: Int): PlayerEntity?
 

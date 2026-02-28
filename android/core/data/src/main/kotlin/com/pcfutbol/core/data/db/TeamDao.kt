@@ -17,6 +17,9 @@ interface TeamDao {
     @Query("SELECT * FROM teams WHERE competitionKey = :key ORDER BY slotId")
     fun byCompetition(key: String): Flow<List<TeamEntity>>
 
+    @Query("SELECT * FROM teams WHERE slotId IN (:ids)")
+    suspend fun byIds(ids: List<Int>): List<TeamEntity>
+
     @Query("SELECT COUNT(*) FROM teams")
     suspend fun count(): Int
 
