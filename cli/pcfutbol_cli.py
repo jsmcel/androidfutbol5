@@ -76,6 +76,8 @@ class Player:
     remate:  int
     pase:    int
     tiro:    int
+    estado_forma: int = 50
+    moral: int = 50
 
     @property
     def overall(self) -> int:
@@ -109,18 +111,8 @@ class Team:
         return "LIGA1" if self.comp == "ES1" else "LIGA2"
 
     def strength(self) -> float:
-        """Fuerza global del equipo (0-100)."""
-        if not self.players:
-            return 50.0
-        starters = sorted(self.players, key=lambda p: p.overall, reverse=True)[:11]
-        gks   = [p for p in starters if p.is_goalkeeper]
-        field_players = [p for p in starters if not p.is_goalkeeper]
-
-        gk_str  = sum(p.gk_strength() for p in gks) / max(len(gks), 1)
-        att_str = sum(p.attack_strength() for p in field_players) / max(len(field_players), 1)
-        def_str = sum(p.defense_strength() for p in field_players) / max(len(field_players), 1)
-
-        return gk_str * 0.25 + att_str * 0.40 + def_str * 0.35
+        """Fuerza global con la misma fórmula base que el motor Android."""
+        return _calc_team_strength_android(self, tactic=None, is_home=False)
 
 
 @dataclass
@@ -220,39 +212,268 @@ def load_teams() -> dict[str, Team]:
 # Match simulator  (Poisson-based, seed-deterministic)
 # ---------------------------------------------------------------------------
 
-def _poisson_goals(lam: float, rng: random.Random) -> int:
-    """Genera goles con distribuciÃ³n Poisson usando el RNG dado."""
+_MASK_32 = 0xFFFFFFFF
+_INT_32_MIN = -0x80000000
+
+
+def _int32(value: int) -> int:
+    value &= _MASK_32
+    return value if value < 0x80000000 else value - 0x100000000
+
+
+def _ushr32(value: int, bits: int) -> int:
+    return (value & _MASK_32) >> bits
+
+
+class KotlinXorWowRandom:
+    """
+    Implementación Python de kotlin.random.Random(seed) (XorWowRandom),
+    para reproducir seeds del motor Android.
+    """
+    def __init__(self, seed: int):
+        s0 = _int32(seed)
+        s1 = _int32(seed >> 32)
+        self.x = _int32(s0)
+        self.y = _int32(s1)
+        self.z = 0
+        self.w = 0
+        self.v = _int32(s0 ^ -1)
+        self.addend = _int32((s0 << 10) ^ _ushr32(s1, 4))
+        if (self.x | self.y | self.z | self.w | self.v) == 0:
+            raise ValueError("Initial state must have at least one non-zero element.")
+        for _ in range(64):
+            self.next_int_raw()
+
+    def next_int_raw(self) -> int:
+        t = _int32(self.x)
+        t = _int32(t ^ _ushr32(t, 2))
+        self.x = self.y
+        self.y = self.z
+        self.z = self.w
+        vv = self.v
+        self.w = vv
+        t = _int32(t ^ _int32(t << 1) ^ vv ^ _int32(vv << 4))
+        self.v = _int32(t)
+        self.addend = _int32(self.addend + 362437)
+        return _int32(self.v + self.addend)
+
+    def next_bits(self, bit_count: int) -> int:
+        if bit_count <= 0:
+            return 0
+        return _ushr32(self.next_int_raw(), 32 - bit_count)
+
+    def next_boolean(self) -> bool:
+        return self.next_bits(1) != 0
+
+    def next_double(self) -> float:
+        hi = self.next_bits(26)
+        lo = self.next_bits(27)
+        return float((hi << 27) + lo) / 9007199254740992.0
+
+    def next_int(self, bound: int) -> int:
+        return self.next_int_range(0, bound)
+
+    def next_int_range(self, from_inclusive: int, until_exclusive: int) -> int:
+        if not until_exclusive > from_inclusive:
+            raise ValueError("Random range is empty.")
+        n = _int32(until_exclusive - from_inclusive)
+        if n > 0 or n == _INT_32_MIN:
+            if n > 0 and (n & -n) == n:
+                v = self.next_bits(n.bit_length() - 1)
+            else:
+                while True:
+                    bits = _ushr32(self.next_int_raw(), 1)
+                    v = bits % n
+                    if bits - v + (n - 1) >= 0:
+                        break
+            return _int32(from_inclusive + v)
+
+        while True:
+            v = self.next_int_raw()
+            if from_inclusive <= v < until_exclusive:
+                return v
+
+
+def _match_squad(team: Team) -> list[Player]:
+    # Android toma los 11 "mejores" por CA en runtime.
+    return sorted(team.players, key=lambda p: (p.ca, p.me), reverse=True)[:11]
+
+
+def _safe_avg(values: list[float], fallback: float = 50.0) -> float:
+    if not values:
+        return fallback
+    return sum(values) / len(values)
+
+
+def _form_factor(player: Player) -> float:
+    return (player.estado_forma - 50) * 0.05
+
+
+def _runtime_bonus(player: Player) -> float:
+    return (player.estado_forma - 50) * 0.02 + ((player.moral - 50) / 100.0) * 2.0
+
+
+def _gk_strength_android(player: Player) -> float:
+    return player.portero * 0.6 + player.re * 0.2 + player.ca * 0.2 + _form_factor(player)
+
+
+def _def_strength_android(player: Player) -> float:
+    return player.entrada * 0.4 + player.ca * 0.3 + player.ve * 0.2 + player.re * 0.1 + _form_factor(player)
+
+
+def _mid_strength_android(player: Player) -> float:
+    return player.pase * 0.35 + player.ca * 0.3 + player.re * 0.2 + player.tiro * 0.15 + _form_factor(player)
+
+
+def _fwd_strength_android(player: Player) -> float:
+    return player.remate * 0.4 + player.regate * 0.25 + player.ca * 0.2 + player.tiro * 0.15 + _form_factor(player)
+
+
+def _calc_team_strength_android(team: Team, tactic: Optional[dict], is_home: bool) -> float:
+    squad = _match_squad(team)
+    if not squad:
+        return 50.0
+
+    gk = squad[0]
+    defenders = squad[1:5]
+    mids = squad[5:9]
+    fwds = squad[9:11]
+
+    gk_score = _gk_strength_android(gk)
+    def_score = _safe_avg([_def_strength_android(p) for p in defenders])
+    mid_score = _safe_avg([_mid_strength_android(p) for p in mids])
+    fwd_score = _safe_avg([_fwd_strength_android(p) for p in fwds])
+
+    base = gk_score * 0.15 + def_score * 0.3 + mid_score * 0.3 + fwd_score * 0.25
+    tactical_bonus = _tactic_adj(tactic, is_home=is_home)
+    runtime = _safe_avg([_runtime_bonus(p) for p in squad], fallback=0.0)
+    return max(10.0, min(99.0, base + tactical_bonus + runtime))
+
+
+def _strength_to_lambda(strength: float, is_home: bool) -> float:
+    norm = (strength - 10.0) / 89.0
+    lam = 0.4 + norm * 2.6
+    return lam * 1.12 if is_home else lam
+
+
+def _apply_expulsion_penalty(lam: float, red_cards: int) -> float:
+    if red_cards <= 0:
+        return lam
+    return max(0.1, lam * 0.8)
+
+
+def _pace_factors(home_tactic: Optional[dict], away_tactic: Optional[dict]) -> tuple[float, float]:
+    home_waste = int((home_tactic or {}).get("perdidaTiempo", 0)) == 1
+    away_waste = int((away_tactic or {}).get("perdidaTiempo", 0)) == 1
+    if home_waste and away_waste:
+        return 0.82, 0.82
+    if home_waste:
+        return 0.88, 0.92
+    if away_waste:
+        return 0.92, 0.88
+    return 1.0, 1.0
+
+
+def _pick_eligible_slot(lineup_size: int, dismissed: set[int], rng: KotlinXorWowRandom) -> Optional[int]:
+    if lineup_size <= 0:
+        return None
+    eligible = [idx for idx in range(lineup_size) if idx not in dismissed]
+    if not eligible:
+        return None
+    return eligible[rng.next_int(len(eligible))]
+
+
+def _discipline_red_cards(
+    home_lineup: list[Player],
+    away_lineup: list[Player],
+    home_tactic: Optional[dict],
+    away_tactic: Optional[dict],
+    rng: KotlinXorWowRandom,
+) -> tuple[int, int]:
+    home_yellows = [0] * len(home_lineup)
+    away_yellows = [0] * len(away_lineup)
+    home_dismissed: set[int] = set()
+    away_dismissed: set[int] = set()
+    home_red = 0
+    away_red = 0
+
+    yellow_count = _poisson_goals(1.5, rng) + _poisson_goals(1.5, rng)
+    for _ in range(yellow_count):
+        if rng.next_boolean():
+            slot = _pick_eligible_slot(len(home_lineup), home_dismissed, rng)
+            if slot is None:
+                continue
+            home_yellows[slot] += 1
+            if home_yellows[slot] >= 2:
+                home_red += 1
+                home_dismissed.add(slot)
+        else:
+            slot = _pick_eligible_slot(len(away_lineup), away_dismissed, rng)
+            if slot is None:
+                continue
+            away_yellows[slot] += 1
+            if away_yellows[slot] >= 2:
+                away_red += 1
+                away_dismissed.add(slot)
+
+    if int((home_tactic or {}).get("faltas", 2)) == 3 and rng.next_double() < 0.05:
+        slot = _pick_eligible_slot(len(home_lineup), home_dismissed, rng)
+        if slot is not None:
+            home_red += 1
+            home_dismissed.add(slot)
+
+    if int((away_tactic or {}).get("faltas", 2)) == 3 and rng.next_double() < 0.05:
+        slot = _pick_eligible_slot(len(away_lineup), away_dismissed, rng)
+        if slot is not None:
+            away_red += 1
+            away_dismissed.add(slot)
+
+    return home_red, away_red
+
+
+def _apply_var_to_goals(goals: int, rng: KotlinXorWowRandom) -> int:
+    remaining = goals
+    for _ in range(goals):
+        if rng.next_double() < 0.18 and rng.next_double() < 0.38:
+            remaining -= 1
+    return max(0, remaining)
+
+def _poisson_goals(lam: float, rng: KotlinXorWowRandom) -> int:
+    """Poisson con Knuth, alineado con MatchSimulator Android."""
     L   = math.exp(-lam)
     k   = 0
     p   = 1.0
     while True:
         k += 1
-        p *= rng.random()
+        p *= rng.next_double()
         if p <= L:
-            return k - 1
+            return max(0, min(9, k - 1))
 
 
-def _tactic_adj(tactic: Optional[dict]) -> float:
-    """
-    Ajuste de fuerza por tÃ¡ctica â€” misma fÃ³rmula que Android StrengthCalculator.
-    tipoJuego:   1=DEFENSIVO(-1.0) 2=EQUILIBRADO(0) 3=OFENSIVO(+1.5)
-    tipoPresion: 1=BAJA(-0.5)      2=MEDIA(0)       3=ALTA(+1.0)
-    extras menores: marcaje, faltas, contragolpe.
-    """
-    if not tactic:
-        return 0.0
-    adj = 0.0
-    tj = tactic.get("tipoJuego", 2)
-    if tj == 3:    adj += 1.5
-    elif tj == 1:  adj -= 1.0
-    tp = tactic.get("tipoPresion", 2)
-    if tp == 3:    adj += 1.0
-    elif tp == 1:  adj -= 0.5
-    if tactic.get("tipoMarcaje", 1) == 1:        adj += 0.3   # al hombre
-    if tactic.get("faltas", 2) == 3:             adj += 0.2   # duro
-    if tactic.get("porcContra", 30) > 60:        adj += 0.3
-    if tactic.get("tipoDespejes", 1) == 2:       adj += 0.2   # controlado
-    if tactic.get("perdidaTiempo", 0) == 1:      adj -= 0.4   # juego mÃ¡s lento
+def _tactic_adj(tactic: Optional[dict], is_home: bool) -> float:
+    """Misma fórmula que StrengthCalculator.tacticalAdjustment()."""
+    t = tactic or {}
+    adj = 3.0 if is_home else 0.0
+    tj = int(t.get("tipoJuego", 2))
+    if tj == 3:
+        adj += 1.5
+    elif tj == 1:
+        adj -= 1.0
+    tp = int(t.get("tipoPresion", 2))
+    if tp == 3:
+        adj += 1.0
+    elif tp == 1:
+        adj -= 0.5
+    if int(t.get("tipoMarcaje", 1)) == 1:
+        adj += 0.3
+    if int(t.get("faltas", 2)) == 3:
+        adj += 0.2
+    if int(t.get("porcContra", 30)) > 60:
+        adj += 0.3
+    if int(t.get("tipoDespejes", 1)) == 2:
+        adj += 0.2
+    if int(t.get("perdidaTiempo", 0)) == 1:
+        adj -= 0.4
     return adj
 
 
@@ -260,22 +481,27 @@ def simulate_match(home: Team, away: Team, seed: int,
                    home_tactic: Optional[dict] = None,
                    away_tactic: Optional[dict] = None) -> tuple[int, int]:
     """
-    Simulador determinÃ­stico con soporte tÃ¡ctico.
-    Devuelve (home_goals, away_goals).
-    Los ajustes tÃ¡cticos siguen la misma fÃ³rmula que Android StrengthCalculator.
+    Simulador determinista alineado con Android:
+    - StrengthCalculator (misma fórmula)
+    - MatchSimulator (Poisson + VAR + rojas + pérdida de tiempo)
     """
-    rng = random.Random(seed)
+    rng = KotlinXorWowRandom(int(seed))
+    home_t = home_tactic or {}
+    away_t = away_tactic or {}
 
-    # Fuerza base + ajuste tÃ¡ctico (igual que Android)
-    home_str = (home.strength() + _tactic_adj(home_tactic)) * 1.05  # ventaja local +5%
-    away_str =  away.strength() + _tactic_adj(away_tactic)
+    home_strength = _calc_team_strength_android(home, home_t, is_home=True)
+    away_strength = _calc_team_strength_android(away, away_t, is_home=False)
+    home_lineup = _match_squad(home)
+    away_lineup = _match_squad(away)
+    home_red, away_red = _discipline_red_cards(home_lineup, away_lineup, home_t, away_t, rng)
 
-    total = max(home_str + away_str, 1.0)
+    home_pace, away_pace = _pace_factors(home_t, away_t)
+    home_lambda = max(0.1, _apply_expulsion_penalty(_strength_to_lambda(home_strength, True), home_red) * home_pace)
+    away_lambda = max(0.1, _apply_expulsion_penalty(_strength_to_lambda(away_strength, False), away_red) * away_pace)
 
-    lambda_home = max(0.3, min(2.8 * (home_str / total), 4.5))
-    lambda_away = max(0.3, min(2.8 * (away_str / total), 4.5))
-
-    return _poisson_goals(lambda_home, rng), _poisson_goals(lambda_away, rng)
+    home_raw = _poisson_goals(home_lambda, rng)
+    away_raw = _poisson_goals(away_lambda, rng)
+    return _apply_var_to_goals(home_raw, rng), _apply_var_to_goals(away_raw, rng)
 
 
 # ---------------------------------------------------------------------------
@@ -283,37 +509,30 @@ def simulate_match(home: Team, away: Team, seed: int,
 # ---------------------------------------------------------------------------
 
 def generate_fixtures(teams: list[Team]) -> list[tuple[Team, Team]]:
-    """Genera todos los fixtures de una temporada completa (doble vuelta)."""
-    n = len(teams)
-    if n % 2 != 0:
-        teams = teams + [Team(slot_id=-1, name="BYE", comp="")]
+    """Genera calendario con el mismo algoritmo de rotación del engine Android."""
+    if len(teams) < 2:
+        return []
+    rotation = list(teams)
+    if len(rotation) % 2 != 0:
+        rotation.append(Team(slot_id=-1, name="BYE", comp=""))
 
-    n = len(teams)
-    fixtures = []
-    rounds_count = n - 1
+    n = len(rotation)
+    rounds = n - 1
+    matches_per_round = n // 2
+    fixtures: list[tuple[Team, Team]] = []
 
-    lst = teams[1:]
-    pivot = teams[0]
+    for _ in range(rounds):
+        for m in range(matches_per_round):
+            home = rotation[m]
+            away = rotation[n - 1 - m]
+            if home.slot_id != -1 and away.slot_id != -1:
+                fixtures.append((home, away))
+        last = rotation.pop()
+        rotation.insert(1, last)
 
-    for r in range(rounds_count):
-        round_home = []
-        round_away = []
-        round_home.append((pivot, lst[r % len(lst)]))
-        for i in range(1, n // 2):
-            h = lst[(r + i) % len(lst)]
-            a = lst[(r - i) % len(lst)]
-            if r % 2 == 0:
-                round_home.append((h, a))
-            else:
-                round_home.append((a, h))
-
-        for h, a in round_home:
-            if h.slot_id != -1 and a.slot_id != -1:
-                fixtures.append((h, a))
-
-    # Segunda vuelta (intercambio local/visitante)
-    second = [(a, h) for h, a in fixtures]
-    return fixtures + second
+    first_leg = list(fixtures)
+    fixtures.extend((away, home) for home, away in first_leg)
+    return fixtures
 
 
 # ---------------------------------------------------------------------------
@@ -326,20 +545,18 @@ def simulate_season(
     seed_base: int = 12345,
     silent: bool = False,
 ) -> list[Standing]:
-    """Simula una temporada completa y devuelve la clasificaciÃ³n final."""
+    """Simula temporada completa con seed por fixture (masterSeed XOR fixtureId)."""
     fixtures = generate_fixtures(teams)
     standings = {t.slot_id: Standing(team=t) for t in teams}
     results: list[MatchResult] = []
-
-    matchdays_total = (len(teams) - 1) * 2
-    fixtures_per_md = len(teams) // 2
+    fixtures_per_md = max(1, len(teams) // 2)
     matchday = 1
 
     for i, (home, away) in enumerate(fixtures):
         if i > 0 and i % fixtures_per_md == 0:
             matchday += 1
-
-        seed = seed_base ^ (matchday * 1000 + home.slot_id * 31 + away.slot_id)
+        fixture_id = i + 1
+        seed = int(seed_base) ^ fixture_id
         hg, ag = simulate_match(home, away, seed)
 
         result = MatchResult(home=home, away=away,
@@ -1631,7 +1848,7 @@ def _tactic_menu(data: dict):
     print(_c(BOLD + YELLOW, "\n  â•â•â• TÃCTICA â•â•â•"))
 
     while True:
-        print(_c(GRAY, f"\n  Ajuste tÃ¡ctico actual: {_tactic_adj(t):+.1f}"))
+        print(_c(GRAY, f"\n  Ajuste tÃ¡ctico actual: {_tactic_adj(t, is_home=False):+.1f}"))
         print(f"  1. Tipo de juego    : {_c(CYAN, _TACTIC_LABELS['tipoJuego'][t['tipoJuego']])}")
         print(f"  2. Marcaje          : {_c(CYAN, _TACTIC_LABELS['tipoMarcaje'][t['tipoMarcaje']])}")
         print(f"  3. PresiÃ³n          : {_c(CYAN, _TACTIC_LABELS['tipoPresion'][t['tipoPresion']])}")
@@ -2124,7 +2341,7 @@ def _match_entrenador(
         time.sleep(0.7)
 
     def minute_strengths() -> tuple[float, float, float]:
-        our_adj = _tactic_adj(tactic_ref[0])
+        our_adj = _tactic_adj(tactic_ref[0], is_home=False)
 
         tempo = 1.0
         if calm_boost[0] > 0:
@@ -2685,8 +2902,12 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
     # Build fixture map (deterministic, sorted by slot_id)
     all_fix    = generate_fixtures(comp_t)
     fix_by_md: dict[int, list[tuple[Team, Team]]] = {}
-    for i, pair in enumerate(all_fix):
-        fix_by_md.setdefault((i // fpm) + 1, []).append(pair)
+    fix_seed_by_key: dict[tuple[int, int, int], int] = {}
+    for i, pair in enumerate(all_fix, start=1):
+        md = ((i - 1) // fpm) + 1
+        h, a = pair
+        fix_by_md.setdefault(md, []).append(pair)
+        fix_seed_by_key[(md, h.slot_id, a.slot_id)] = int(seed) ^ i
 
     results = data.setdefault("results", [])
     news    = data.setdefault("news", [])
@@ -2739,7 +2960,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
         elif op == 1:
             md_res = []
             for h, a in fix_by_md.get(cur_md, []):
-                s            = seed ^ (cur_md * 7919 + h.slot_id * 31 + a.slot_id)
+                s            = fix_seed_by_key.get((cur_md, h.slot_id, a.slot_id), seed ^ (cur_md * 7919 + h.slot_id * 31 + a.slot_id))
                 is_mgr_match = h.slot_id == mgr_slot or a.slot_id == mgr_slot
                 ht           = tactic if h.slot_id == mgr_slot else None
                 at           = tactic if a.slot_id == mgr_slot else None
@@ -2802,7 +3023,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             for md in range(cur_md, tot_md + 1):
                 md_res = []
                 for h, a in fix_by_md.get(md, []):
-                    s  = seed ^ (md * 7919 + h.slot_id * 31 + a.slot_id)
+                    s  = fix_seed_by_key.get((md, h.slot_id, a.slot_id), seed ^ (md * 7919 + h.slot_id * 31 + a.slot_id))
                     ht = tactic if h.slot_id == mgr_slot else None
                     at = tactic if a.slot_id == mgr_slot else None
                     hg, ag = simulate_match(h, a, s, home_tactic=ht, away_tactic=at)
