@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 PC FÃºtbol 5 â€” Clon CLI (Python)
 Temporada 2025/26  Â·  Datos reales extraÃ­dos del juego original
@@ -1870,267 +1870,434 @@ def _match_entrenador(
     mgr_slot: int, data: dict,
 ) -> tuple:
     """
-    Modo entrenador: 90 min. animados con fichas, VAR, tiempo aÃ±adido,
-    5 cambios / 3 ventanas en juego / ventana libre en el descanso,
-    6Âº cambio de concusiÃ³n si hay golpe en la cabeza.
+    Modo entrenador avanzado.
+    El partido se genera minuto a minuto y las decisiones en vivo del manager
+    modifican ritmo, ocasiones, conversion y riesgo disciplinario.
     """
     tactic_ref = [data.get("tactic", dict(DEFAULT_TACTIC))]
+    rng = random.Random(seed)
 
-    # â”€â”€ Determine initial result from Poisson â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    rng      = random.Random(seed)
-    ht0      = tactic_ref[0] if home.slot_id == mgr_slot else None
-    at0      = tactic_ref[0] if away.slot_id == mgr_slot else None
-    home_str = (home.strength() + _tactic_adj(ht0)) * 1.05
-    away_str =  away.strength() + _tactic_adj(at0)
-    total    = max(home_str + away_str, 0.01)
-    lh       = max(0.3, min(2.8 * (home_str / total), 4.5))
-    la       = max(0.3, min(2.8 * (away_str / total), 4.5))
-    base_hg  = _poisson_goals(lh, rng)
-    base_ag  = _poisson_goals(la, rng)
-
-    # â”€â”€ Generate event schedule â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    pool    = list(range(1, 91))
-    hg_mins = sorted(rng.sample(pool, min(base_hg, len(pool)))) if base_hg else []
-    ag_mins = sorted(rng.sample(pool, min(base_ag, len(pool)))) if base_ag else []
-
-    # Base yellow cards (more if time-wasting active)
-    n_yellow = rng.randint(2, 5)
-    if tactic_ref[0].get("perdidaTiempo", 0) == 1:
-        n_yellow += rng.randint(1, 3)
-
-    events: list = []
-    for m in hg_mins: events.append((m, "goal",   home.slot_id))
-    for m in ag_mins: events.append((m, "goal",   away.slot_id))
-    for _ in range(n_yellow):
-        ev_type = "yellow_tw" if (
-            tactic_ref[0].get("perdidaTiempo", 0) == 1
-            and rng.random() < 0.4
-        ) else "yellow"
-        events.append((rng.randint(5, 88), ev_type,
-                       rng.choice([home.slot_id, away.slot_id])))
-    # Head-injury event (30% chance)
-    if rng.random() < 0.30:
-        events.append((rng.randint(10, 85), "injury",
-                       rng.choice([home.slot_id, away.slot_id])))
-    events.sort()
-
-    # â”€â”€ Match state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    is_home_mgr  = home.slot_id == mgr_slot
+    is_home_mgr = home.slot_id == mgr_slot
     mgr_team_obj = home if is_home_mgr else away
-    our_str      = home_str if is_home_mgr else away_str
-    opp_str      = away_str if is_home_mgr else home_str
 
-    # Mutable refs (lists so inner functions can write without nonlocal)
-    cur       = [0, 0]       # [cur_hg, cur_ag]
-    ball      = [2]          # ball_zone
-    subs      = [5]          # remaining substitutions
-    wins      = [3]          # remaining in-play windows
-    concuss   = [True]       # concussion sub available (6th sub)
-    smade     = []           # names substituted out
-    halfdone  = [False]
-    # For added-time calculation
-    yellows   = [0, 0]       # per half
-    var_rev   = [0, 0]
-    goals_h   = [0, 0]
-    subs_h    = [0, 0]
-    TICK      = 0.13
-    ev_idx    = [0]
+    home_base = home.strength() * 1.05
+    away_base = away.strength()
+    our_base = home_base if is_home_mgr else away_base
+    opp_base = away_base if is_home_mgr else home_base
 
-    # â”€â”€ Inner helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    def draw(minute, msg=""):
-        _draw_frame(home, away, is_home_mgr, cur[0], cur[1], minute, ball[0], msg)
+    # Mutable state refs
+    cur = [0, 0]              # score home/away
+    ball = [2]                # 0..4 (towards manager attack -> 0)
+    subs = [5]
+    wins = [3]
+    concuss = [True]          # one extra concussion sub
+    smade: list[str] = []
 
-    def collect(minute):
-        evs = []
-        while ev_idx[0] < len(events) and events[ev_idx[0]][0] == minute:
-            evs.append(events[ev_idx[0]])
-            ev_idx[0] += 1
-        return evs
+    halfdone = [False]
+    yellows = [0, 0]
+    reds = [0, 0]             # [manager, rival]
+    var_rev = [0, 0]
+    goals_h = [0, 0]
+    subs_h = [0, 0]
+
+    attack_boost = [0]
+    defend_boost = [0]
+    press_boost = [0]
+    calm_boost = [0]
+    momentum = [0.0]          # positive favours manager
+
+    TICK = 0.11
+
+    def clamp(v: float, lo: float, hi: float) -> float:
+        return max(lo, min(hi, v))
+
+    def manager_score() -> int:
+        return cur[0] if is_home_mgr else cur[1]
+
+    def rival_score() -> int:
+        return cur[1] if is_home_mgr else cur[0]
+
+    def manager_leading() -> bool:
+        return manager_score() > rival_score()
+
+    def current_half_idx() -> int:
+        return 1 if halfdone[0] else 0
+
+    def order_status() -> str:
+        st = []
+        if attack_boost[0] > 0:
+            st.append(f"Ataque total {attack_boost[0]}'")
+        if defend_boost[0] > 0:
+            st.append(f"Bloque bajo {defend_boost[0]}'")
+        if press_boost[0] > 0:
+            st.append(f"Presion alta {press_boost[0]}'")
+        if calm_boost[0] > 0:
+            st.append(f"Calmar juego {calm_boost[0]}'")
+        return " | ".join(st) if st else "Sin orden especial"
+
+    def draw(minute, msg: str = ""):
+        status = _c(CYAN, f"Ordenes: {order_status()} · Mom {momentum[0]:+.2f} · Rojas {reds[0]}-{reds[1]}")
+        payload = (msg + "\n  " + status) if msg else status
+        _draw_frame(home, away, is_home_mgr, cur[0], cur[1], minute, ball[0], payload)
+
+    def decay_orders():
+        for ref in (attack_boost, defend_boost, press_boost, calm_boost):
+            if ref[0] > 0:
+                ref[0] -= 1
+
+    def set_live_order(code: str, minute) -> bool:
+        code = code.strip().upper()
+        if code == "A":
+            attack_boost[0] = 10
+            defend_boost[0] = 0
+            calm_boost[0] = 0
+            momentum[0] += 0.12
+            draw(minute, _c(BOLD + YELLOW, "ORDEN: Todo al ataque (10')"))
+            time.sleep(0.9)
+            return True
+        if code == "D":
+            defend_boost[0] = 10
+            attack_boost[0] = 0
+            press_boost[0] = 0
+            momentum[0] -= 0.05
+            draw(minute, _c(BOLD + CYAN, "ORDEN: Bloque bajo (10')"))
+            time.sleep(0.9)
+            return True
+        if code == "P":
+            press_boost[0] = 8
+            calm_boost[0] = 0
+            momentum[0] += 0.08
+            draw(minute, _c(BOLD + YELLOW, "ORDEN: Presion alta (8') · mas riesgo de amarillas"))
+            time.sleep(0.9)
+            return True
+        if code == "C":
+            calm_boost[0] = 8
+            press_boost[0] = 0
+            momentum[0] += 0.03 if manager_leading() else -0.03
+            draw(minute, _c(BOLD + CYAN, "ORDEN: Calmar partido / pausa (8')"))
+            time.sleep(0.9)
+            return True
+        return False
 
     def sub_window(half_idx: int):
-        """Let manager make multiple subs in one window; uses one window slot."""
         while subs[0] > 0:
             if not _entrenador_substitution(mgr_team_obj, smade):
                 break
             subs[0] -= 1
             subs_h[half_idx] += 1
+            momentum[0] += 0.06
             if subs[0] == 0:
                 break
-            nx = input(_c(CYAN, f"  Â¿Otro cambio? ({subs[0]} restantes) [S=SÃ­ / Intro=No]: ")).strip().upper()
-            if nx != 'S':
+            nx = input(_c(CYAN, f"  Otro cambio? ({subs[0]} restantes) [S=Si / Intro=No]: ")).strip().upper()
+            if nx != "S":
                 break
         wins[0] -= 1
 
     def offer_stop(minute, msg: str):
-        """Tactical pause: offer window / tactic change / continue."""
         draw(minute, msg)
         print()
         if wins[0] > 0 and subs[0] > 0:
-            print(_c(CYAN,   f"  W. Ventana de cambios  ({wins[0]} ventanas Â· {subs[0]} cambios)"))
-        print(_c(CYAN,       "  T. Cambiar tÃ¡ctica"))
-        print(_c(CYAN,       "  0. Continuar"))
+            print(_c(CYAN, f"  W. Ventana de cambios ({wins[0]} ventanas · {subs[0]} cambios)"))
+        print(_c(CYAN, "  A. Todo al ataque (10')"))
+        print(_c(CYAN, "  D. Bloque bajo (10')"))
+        print(_c(CYAN, "  P. Presion alta (8', mas tarjetas)"))
+        print(_c(CYAN, "  C. Calmar partido (8')"))
+        print(_c(CYAN, "  T. Cambiar tactica completa"))
+        print(_c(CYAN, "  0. Continuar"))
         ch = input("  > ").strip().upper()
-        half_idx = 1 if halfdone[0] else 0
+
+        half_idx = current_half_idx()
         if ch == "W" and wins[0] > 0 and subs[0] > 0:
             sub_window(half_idx)
         elif ch == "T":
             _tactic_menu(data)
             tactic_ref[0] = data.get("tactic", tactic_ref[0])
-
-    def process_goal(ev_min, ev_team, minute):
-        half_idx = 1 if halfdone[0] else 0
-        is_mgr   = (ev_team == mgr_slot)
-        tname    = home.name if ev_team == home.slot_id else away.name
-        if ev_team == home.slot_id:
-            ball[0] = 0 if is_home_mgr else 4
-            cur[0] += 1
         else:
-            ball[0] = 0 if not is_home_mgr else 4
-            cur[1] += 1
-        goals_h[half_idx] += 1
-        gc  = GREEN if is_mgr else RED
-        msg = _c(gc + BOLD, f"âš½  Â¡GOL de {tname}!   {cur[0]} - {cur[1]}")
-        draw(minute, msg)
-        time.sleep(2.0)
-        # VAR review (18% chance)
-        var_disallowed = False
-        if rng.random() < 0.18:
-            var_rev[half_idx] += 1
-            draw(minute, _c(BOLD + CYAN, "ðŸŽ¥  VAR revisando el gol..."))
-            time.sleep(2.0)
-            if rng.random() < 0.38:
-                reason = rng.choice(["fuera de juego", "mano en el Ã¡rea",
-                                     "penalti no seÃ±alado en el origen"])
-                if ev_team == home.slot_id: cur[0] -= 1
-                else:                       cur[1] -= 1
-                goals_h[half_idx] -= 1
-                dc = RED if is_mgr else GREEN
-                draw(minute, _c(dc + BOLD, f"âŒ  GOL ANULADO â€” VAR: {reason}"))
-                time.sleep(2.5)
-                ball[0] = 2
-                var_disallowed = True
+            set_live_order(ch, minute)
+
+    def register_goal(scored_by_manager: bool, minute, source: str):
+        half_idx = current_half_idx()
+
+        if scored_by_manager:
+            if is_home_mgr:
+                cur[0] += 1
             else:
-                draw(minute, _c(GREEN + BOLD, "âœ…  GOL CONFIRMADO por VAR"))
-                time.sleep(1.5)
-        if not var_disallowed:
-            offer_stop(minute, msg)
-            ball[0] = 2
-
-    def process_yellow(ev_min, ev_type, ev_team, minute):
-        half_idx = 1 if halfdone[0] else 0
-        is_mgr   = (ev_team == mgr_slot)
-        tname    = home.name if ev_team == home.slot_id else away.name
-        yellows[half_idx] += 1
-        tw  = " â€” pÃ©rdida de tiempo" if ev_type == "yellow_tw" else ""
-        yc  = YELLOW if is_mgr else GRAY
-        draw(minute, _c(yc, f"ðŸŸ¡  Amarilla{tw}  â€”  {tname}  (min. {ev_min})"))
-        time.sleep(1.0)
-
-    def process_injury(ev_min, ev_team, minute):
-        tname = home.name if ev_team == home.slot_id else away.name
-        half_idx = 1 if halfdone[0] else 0
-        if concuss[0] and ev_team == mgr_slot:
-            draw(minute, _c(RED + BOLD,
-                            f"ðŸš‘  Â¡GOLPE EN LA CABEZA! â€” {tname} â€” CAMBIO DE CONCUSIÃ“N"))
-            print(_c(YELLOW, "  6Âª sustituciÃ³n por traumatismo (no cuenta como ventana)"))
-            if _entrenador_substitution(mgr_team_obj, smade):
-                concuss[0]  = False
-                subs_h[half_idx] += 1
+                cur[1] += 1
+            gc = GREEN
+            tname = mgr_team_obj.name
+            momentum[0] += 0.75
         else:
-            draw(minute, _c(GRAY, f"ðŸš‘  Golpe leve â€” {tname} continÃºa  (min. {ev_min})"))
-            time.sleep(1.0)
+            if is_home_mgr:
+                cur[1] += 1
+            else:
+                cur[0] += 1
+            gc = RED
+            tname = away.name if is_home_mgr else home.name
+            momentum[0] -= 0.75
 
-    # â”€â”€ Opening frame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    draw(1, _c(GRAY, "  [Intro] para comenzar el partido..."))
+        goals_h[half_idx] += 1
+        draw(minute, _c(gc + BOLD, f"GOOOL {tname} ({source})  ->  {cur[0]}-{cur[1]}"))
+        time.sleep(1.3)
+
+        # VAR review
+        if rng.random() < 0.15:
+            var_rev[half_idx] += 1
+            draw(minute, _c(BOLD + CYAN, "VAR revisando la accion..."))
+            time.sleep(1.0)
+            if rng.random() < 0.32:
+                if scored_by_manager:
+                    if is_home_mgr:
+                        cur[0] -= 1
+                    else:
+                        cur[1] -= 1
+                    momentum[0] -= 0.35
+                    dc = RED
+                else:
+                    if is_home_mgr:
+                        cur[1] -= 1
+                    else:
+                        cur[0] -= 1
+                    momentum[0] += 0.35
+                    dc = GREEN
+                goals_h[half_idx] -= 1
+                draw(minute, _c(dc + BOLD, "GOL ANULADO por VAR"))
+                ball[0] = 2
+                time.sleep(1.1)
+                return
+            draw(minute, _c(GREEN + BOLD, "GOL confirmado por VAR"))
+            time.sleep(0.9)
+
+        offer_stop(minute, _c(gc + BOLD, f"Tras el gol de {tname}: decide rapido."))
+        ball[0] = 2
+
+    def maybe_card(minute):
+        half_idx = current_half_idx()
+        faltas = int(tactic_ref[0].get("faltas", 2))
+        p_card = 0.008 + (0.004 if faltas == 3 else 0.0) + (0.004 if press_boost[0] > 0 else 0.0)
+        if rng.random() >= p_card:
+            return
+
+        manager_team_card = rng.random() < (0.52 + (0.10 if faltas == 3 else 0.0))
+        if manager_team_card:
+            yellows[half_idx] += 1
+            draw(minute, _c(YELLOW, f"Amarilla para {mgr_team_obj.name} ({minute}')"))
+            time.sleep(0.6)
+
+            p_red = 0.06 + (0.08 if faltas == 3 else 0.0) + (0.05 if press_boost[0] > 0 else 0.0)
+            if rng.random() < p_red:
+                reds[0] += 1
+                momentum[0] -= 0.45
+                draw(minute, _c(RED + BOLD, f"ROJA para {mgr_team_obj.name}. Te quedas con {11 - reds[0]}."))
+                time.sleep(0.9)
+                offer_stop(minute, _c(RED + BOLD, "Con 10 (o menos): ajusta el plan."))
+        else:
+            yellows[half_idx] += 1
+            rival_name = away.name if is_home_mgr else home.name
+            draw(minute, _c(GRAY, f"Amarilla para {rival_name} ({minute}')"))
+            time.sleep(0.5)
+            if rng.random() < 0.07:
+                reds[1] += 1
+                momentum[0] += 0.35
+                draw(minute, _c(GREEN + BOLD, f"ROJA para {rival_name}. Juegan con {11 - reds[1]}."))
+                time.sleep(0.9)
+                offer_stop(minute, _c(GREEN + BOLD, "Rival con uno menos: quieres apretar o pausar?"))
+
+    def maybe_injury(minute):
+        half_idx = current_half_idx()
+        p_injury = 0.0025 + (0.0015 if press_boost[0] > 0 else 0.0)
+        if rng.random() >= p_injury:
+            return
+
+        manager_side = rng.random() < 0.5
+        if manager_side and concuss[0]:
+            draw(minute, _c(RED + BOLD, "Golpe en la cabeza en tu equipo. Tienes cambio extra."))
+            if _entrenador_substitution(mgr_team_obj, smade):
+                concuss[0] = False
+                subs_h[half_idx] += 1
+                momentum[0] -= 0.10
+        elif manager_side:
+            draw(minute, _c(GRAY, "Golpe leve en tu equipo. Siguen todos."))
+            momentum[0] -= 0.08
+        else:
+            draw(minute, _c(GRAY, "Golpe leve en el rival. El juego sigue."))
+            momentum[0] += 0.05
+        time.sleep(0.7)
+
+    def minute_strengths() -> tuple[float, float, float]:
+        our_adj = _tactic_adj(tactic_ref[0])
+
+        tempo = 1.0
+        if calm_boost[0] > 0:
+            tempo *= 0.82
+        if press_boost[0] > 0:
+            tempo *= 1.18
+        if int(tactic_ref[0].get("perdidaTiempo", 0)) == 1 and manager_leading():
+            tempo *= 0.78
+
+        our_live = our_base + our_adj + momentum[0] * 1.0
+        opp_live = opp_base - momentum[0] * 0.75
+
+        if attack_boost[0] > 0:
+            our_live += 1.7
+            opp_live += 0.9
+        if defend_boost[0] > 0:
+            our_live -= 0.6
+            opp_live -= 0.8
+        if press_boost[0] > 0:
+            our_live += 0.8
+            opp_live -= 0.4
+
+        our_live *= max(0.62, 1.0 - reds[0] * 0.10)
+        opp_live *= max(0.62, 1.0 - reds[1] * 0.10)
+
+        return max(10.0, our_live), max(10.0, opp_live), tempo
+
+    def maybe_chance(minute):
+        our_live, opp_live, tempo = minute_strengths()
+        ball[0] = _ball_drift(ball[0], rng, our_live, opp_live)
+
+        zone_our = [1.90, 1.40, 1.00, 0.64, 0.35][ball[0]]
+        zone_opp = [0.35, 0.64, 1.00, 1.40, 1.90][ball[0]]
+        ratio = our_live / max(our_live + opp_live, 0.01)
+
+        p_our = min(0.35, 0.020 * zone_our * (0.85 + ratio * 0.9) * tempo)
+        p_opp = min(0.35, 0.020 * zone_opp * (0.85 + (1.0 - ratio) * 0.9) * tempo)
+
+        r = rng.random()
+        if r < p_our:
+            conv = 0.18 + (our_live - opp_live) / 220.0
+            if attack_boost[0] > 0:
+                conv += 0.05
+            if defend_boost[0] > 0:
+                conv -= 0.03
+            if calm_boost[0] > 0:
+                conv -= 0.02
+            conv = clamp(conv, 0.07, 0.62)
+
+            if rng.random() < conv:
+                register_goal(True, minute, "jugada")
+            else:
+                msg = rng.choice(_COMM_ATT)
+                draw(minute, _c(YELLOW, f"Ocasion tuya: {msg}"))
+                time.sleep(0.35)
+            return
+
+        if r < p_our + p_opp:
+            conv = 0.18 + (opp_live - our_live) / 220.0
+            if defend_boost[0] > 0:
+                conv -= 0.04
+            if attack_boost[0] > 0:
+                conv += 0.04
+            conv = clamp(conv, 0.07, 0.60)
+
+            if rng.random() < conv:
+                register_goal(False, minute, "contra rival")
+            else:
+                draw(minute, _c(GRAY, f"Rival avisa: {rng.choice(_COMM_ATT)}"))
+                time.sleep(0.30)
+
+    # Kickoff
+    draw(1, _c(GRAY, "[Intro] para comenzar..."))
     input()
 
-    # â”€â”€ First half (1â€“45) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # 1st half
     for minute in range(1, 46):
-        for ev_min, ev_type, ev_team in collect(minute):
-            if ev_type == "goal":
-                process_goal(ev_min, ev_team, minute)
-            elif ev_type in ("yellow", "yellow_tw"):
-                process_yellow(ev_min, ev_type, ev_team, minute)
-            elif ev_type == "injury":
-                process_injury(ev_min, ev_team, minute)
-        ball[0] = _ball_drift(ball[0], rng, our_str, opp_str)
+        maybe_chance(minute)
+        maybe_card(minute)
+        maybe_injury(minute)
+
+        if minute in (30, 40):
+            offer_stop(minute, _c(CYAN, "Parada tactica de banquillo."))
+
         draw(minute)
         time.sleep(TICK)
 
-    # â”€â”€ Added time â€” 1st half â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    at1 = max(1, min(6,
-               1 + yellows[0] + var_rev[0] * 2 + goals_h[0] + rng.randint(0, 1)))
-    draw(f"45+{at1}", _c(BOLD + YELLOW, f"â±  TIEMPO AÃ‘ADIDO: +{at1} min."))
-    time.sleep(1.5)
+        decay_orders()
+        momentum[0] *= 0.92
+
+    # Added time 1st half
+    at1 = max(1, min(6, 1 + yellows[0] + var_rev[0] * 2 + goals_h[0] + reds[0] + reds[1] + rng.randint(0, 1)))
+    draw(f"45+{at1}", _c(BOLD + YELLOW, f"Tiempo anadido: +{at1}"))
+    time.sleep(1.0)
     for a in range(1, at1 + 1):
         draw(f"45+{a}")
         time.sleep(TICK * 0.6)
 
-    # â”€â”€ Halftime break (free window â€” no win slot used) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Halftime
     halfdone[0] = True
-    draw("HT", _c(BOLD + YELLOW, "â”â”â”â”â”â”â”â”â”â”  DESCANSO  â”â”â”â”â”â”â”â”â”â”"))
+    draw("HT", _c(BOLD + YELLOW, "DESCANSO"))
     print()
     while True:
-        print(_c(CYAN, "  T. Cambiar tÃ¡ctica"))
+        print(_c(CYAN, "  T. Cambiar tactica"))
         if subs[0] > 0:
-            print(_c(CYAN, f"  S. SustituciÃ³n  ({subs[0]} cambios Â· ventana de descanso â€” GRATIS)"))
-        print(_c(CYAN, "  0. Continuar con la 2Âª parte"))
-        ch = input("  OpciÃ³n: ").strip().upper()
-        if ch in ("0", ""):
+            print(_c(CYAN, f"  S. Sustitucion ({subs[0]} cambios, ventana gratis de descanso)"))
+        print(_c(CYAN, "  A. Todo al ataque (10')"))
+        print(_c(CYAN, "  D. Bloque bajo (10')"))
+        print(_c(CYAN, "  P. Presion alta (8')"))
+        print(_c(CYAN, "  C. Calmar partido (8')"))
+        print(_c(CYAN, "  0. Empezar 2a parte"))
+        ch = input("  Opcion: ").strip().upper()
+        if ch in ("", "0"):
             break
-        elif ch == "T":
+        if ch == "T":
             _tactic_menu(data)
             tactic_ref[0] = data.get("tactic", tactic_ref[0])
-        elif ch == "S" and subs[0] > 0:
+            continue
+        if ch == "S" and subs[0] > 0:
             while subs[0] > 0:
                 if not _entrenador_substitution(mgr_team_obj, smade):
                     break
-                subs[0] -= 1; subs_h[1] += 1
+                subs[0] -= 1
+                subs_h[1] += 1
                 if subs[0] == 0:
                     break
-                nx = input(_c(CYAN, f"  Â¿Otro cambio? ({subs[0]} restantes) [S/N]: ")).strip().upper()
-                if nx != 'S':
+                nx = input(_c(CYAN, f"  Otro cambio? ({subs[0]} restantes) [S/N]: ")).strip().upper()
+                if nx != "S":
                     break
+            continue
+        set_live_order(ch, "HT")
+
     ball[0] = 2
 
-    # â”€â”€ Second half (46â€“90) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # 2nd half
     for minute in range(46, 91):
-        for ev_min, ev_type, ev_team in collect(minute):
-            if ev_type == "goal":
-                process_goal(ev_min, ev_team, minute)
-            elif ev_type in ("yellow", "yellow_tw"):
-                process_yellow(ev_min, ev_type, ev_team, minute)
-            elif ev_type == "injury":
-                process_injury(ev_min, ev_team, minute)
-        # In-play substitution windows at 60', 70', 80'
+        maybe_chance(minute)
+        maybe_card(minute)
+        maybe_injury(minute)
+
         if minute in (60, 70, 80) and wins[0] > 0 and subs[0] > 0:
-            offer_stop(minute, _c(CYAN,
-                       f"  min.{minute}' â€” Parada tÃ¡ctica  ({wins[0]} ventanas Â· {subs[0]} cambios)"))
-        ball[0] = _ball_drift(ball[0], rng, our_str, opp_str)
+            offer_stop(minute, _c(CYAN, f"min {minute}: ventana de decisiones"))
+        elif minute in (75, 85):
+            offer_stop(minute, _c(CYAN, f"min {minute}: tramo clave, decide."))
+
         draw(minute)
         time.sleep(TICK)
 
-    # â”€â”€ Added time â€” 2nd half â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        decay_orders()
+        momentum[0] *= 0.92
+
+    # Added time 2nd half
     at2 = max(2, min(10,
-               2 + yellows[1] + var_rev[1] * 2 + goals_h[1]
-               + int(subs_h[1] * 0.5)
-               + (2 if tactic_ref[0].get("perdidaTiempo", 0) == 1 else 0)
-               + rng.randint(0, 3)))
-    draw(90, _c(BOLD + YELLOW, f"â±  TIEMPO AÃ‘ADIDO: +{at2} min."))
-    time.sleep(2.0)
+           2 + yellows[1] + var_rev[1] * 2 + goals_h[1]
+           + int(subs_h[1] * 0.5)
+           + reds[0] + reds[1]
+           + (2 if int(tactic_ref[0].get("perdidaTiempo", 0)) == 1 else 0)
+           + rng.randint(0, 2)))
+    draw(90, _c(BOLD + YELLOW, f"Tiempo anadido: +{at2}"))
+    time.sleep(1.1)
     for a in range(1, at2 + 1):
         draw(f"90+{a}")
         time.sleep(TICK * 0.5)
 
-    # â”€â”€ Full time â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     fhg, fag = cur[0], cur[1]
-    won  = (is_home_mgr and fhg > fag) or (not is_home_mgr and fag > fhg)
+    won = (is_home_mgr and fhg > fag) or (not is_home_mgr and fag > fhg)
     lost = (is_home_mgr and fhg < fag) or (not is_home_mgr and fag < fhg)
-    rc   = GREEN if won else (RED if lost else CYAN)
-    res  = "Â¡VICTORIA!" if won else ("DERROTA" if lost else "EMPATE")
-    draw("FT", _c(rc + BOLD, f"â”â”  PITIDO FINAL  â”â”   {res}   {fhg} - {fag}"))
+    rc = GREEN if won else (RED if lost else CYAN)
+    res = "VICTORIA" if won else ("DERROTA" if lost else "EMPATE")
+    draw("FT", _c(rc + BOLD, f"PITIDO FINAL · {res} · {fhg}-{fag}"))
     input(_c(GRAY, "  [Intro] para continuar..."))
     return fhg, fag
+
 
 
 # ---- Transfer market -------------------------------------------------------
