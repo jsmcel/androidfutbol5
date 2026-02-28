@@ -618,6 +618,95 @@ def menu_team_strength(liga1: list[Team], liga2: list[Team]):
     print()
 
 
+REAL_LEAGUES = [
+    ("Spanish La Liga",            4335, "LIGA1"),
+    ("Spanish La Liga 2",          4400, "LIGA2"),
+    ("Primera RFEF Grupo 1",       5086, "LIGA2B"),
+    ("Primera RFEF Grupo 2",       5088, "LIGA2B2"),
+    ("English Premier League",     4328, "PRML"),
+    ("Italian Serie A",            4332, "SERIA"),
+    ("French Ligue 1",             4334, "LIG1"),
+    ("German Bundesliga",          4331, "BUN1"),
+    ("Dutch Eredivisie",           4337, "ERED"),
+    ("Portuguese Primeira Liga",   4344, "PRIM"),
+    ("Belgian Pro League",         4338, "BELGA"),
+    ("Turkish Super Lig",          4339, "SUPERL"),
+    ("Scottish Premiership",       4330, "SCOT"),
+    ("Russian Premier League",     4355, "RPL"),
+    ("Danish Superliga",           4340, "DSL"),
+    ("Polish Ekstraklasa",         4422, "EKSTR"),
+    ("Austrian Bundesliga",        4621, "ABUND"),
+    ("Argentine Primera Division", 4406, "ARGPD"),
+    ("Brazilian Serie A",          4351, "BRASEA"),
+    ("Mexican Liga MX",            4350, "LIGAMX"),
+    ("Saudi Pro League",           4668, "SPL"),
+]
+
+
+def menu_real_football() -> None:
+    """Muestra clasificacion y resultados reales de cualquier liga via TheSportsDB."""
+    import urllib.request
+    import json
+
+    BASE = "https://www.thesportsdb.com/api/v1/json/3"
+
+    while True:
+        print(_c(CYAN, "\n=== ACTUALIDAD FUTBOLISTICA ==="))
+        for i, (name, _, code) in enumerate(REAL_LEAGUES, 1):
+            print(f"  {i:>2}. {name} ({code})")
+        print("   0. Volver")
+
+        op = input_int("  Liga: ", 0, len(REAL_LEAGUES))
+        if op == 0:
+            return
+
+        name, league_id, _ = REAL_LEAGUES[op - 1]
+        print(_c(YELLOW, f"\n  {name}"))
+        print("  1. Clasificacion")
+        print("  2. Ultimos resultados")
+        sub = input_int("  Opcion: ", 1, 2)
+
+        try:
+            if sub == 1:
+                url = f"{BASE}/lookuptable.php?l={league_id}&s=2024-2025"
+                with urllib.request.urlopen(url, timeout=8) as r:
+                    data = json.loads(r.read())
+                rows = data.get("table") or []
+                if not rows:
+                    print(_c(RED, "  Sin datos para esta liga."))
+                else:
+                    print(f"\n{'Pos':<4} {'Equipo':<28} {'PJ':>3} {'G':>3} {'E':>3} {'P':>3} {'GF':>4} {'GC':>4} {'Pts':>4}")
+                    print("-" * 58)
+                    for i, row in enumerate(rows, 1):
+                        print(
+                            f"{i:<4} {row.get('name', '')[:27]:<28} "
+                            f"{row.get('played', '')!s:>3} {row.get('win', '')!s:>3} "
+                            f"{row.get('draw', '')!s:>3} {row.get('loss', '')!s:>3} "
+                            f"{row.get('goalsfor', '')!s:>4} {row.get('goalsagainst', '')!s:>4} "
+                            f"{row.get('total', '')!s:>4}"
+                        )
+            else:
+                url = f"{BASE}/eventspastleague.php?id={league_id}"
+                with urllib.request.urlopen(url, timeout=8) as r:
+                    data = json.loads(r.read())
+                events = (data.get("events") or [])[-15:][::-1]
+                if not events:
+                    print(_c(RED, "  Sin resultados disponibles."))
+                else:
+                    print()
+                    for ev in events:
+                        hs = ev.get("intHomeScore") or "-"
+                        aws = ev.get("intAwayScore") or "-"
+                        home = ev.get("strHomeTeam", "")[:22]
+                        away = ev.get("strAwayTeam", "")[:22]
+                        date = ev.get("dateEvent", "")
+                        print(f"  {date}  {home:>22} {hs}-{aws}  {away}")
+        except Exception as e:
+            print(_c(RED, f"  Error de conexion: {e}"))
+
+        _pause()
+
+
 # ===========================================================================
 # PRO MANAGER — MODO CARRERA
 # ===========================================================================
@@ -2174,10 +2263,11 @@ def main_menu():
         print(_c(CYAN,   "  │  5. Ranking de fortaleza         │"))
         print(_c(BOLD + CYAN, "  │  6. PRO MANAGER (modo carrera)  │"))
         print(_c(BOLD + CYAN, "  │  7. MULTIJUGADOR por turnos     │"))
+        print("  8. Actualidad futbolistica (datos reales)")
         print(_c(CYAN,   "  │  0. Salir                        │"))
         print(_c(CYAN,   "  └──────────────────────────────────┘"))
 
-        op = input_int("  Opción: ", 0, 7)
+        op = input_int("  Opción: ", 0, 8)
         if op == 0:
             print(_c(GRAY, "\n  ¡Hasta la próxima temporada!\n"))
             break
@@ -2195,6 +2285,8 @@ def main_menu():
             menu_promanager(liga1, liga2)
         elif op == 7:
             menu_multiplayer(liga1, liga2)
+        elif op == 8:
+            menu_real_football()
 
 
 if __name__ == "__main__":
