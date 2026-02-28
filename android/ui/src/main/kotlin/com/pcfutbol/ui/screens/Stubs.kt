@@ -67,6 +67,7 @@ import java.util.UUID
 fun LigaSelectScreen(
     onNavigateUp: () -> Unit,
     onStandings: (String) -> Unit,
+    onEconomy: () -> Unit = {},
     onStats: () -> Unit = {},
     onMatchday: (Int) -> Unit,
     onTeam: () -> Unit,
@@ -224,6 +225,12 @@ fun LigaSelectScreen(
                             color = DosCyan,
                         )
                     }
+                    DosButton(
+                        text = "ECONOMIA",
+                        onClick = onEconomy,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = DosYellow,
+                    )
                     DosButton(
                         text = "JORNADA ${ligaState.currentMatchday} (${ligaState.selectedLeague})",
                         onClick = { onMatchday(ligaState.currentMatchday) },

@@ -14,6 +14,9 @@ interface NewsDao {
     @Query("SELECT * FROM news ORDER BY id DESC LIMIT :limit")
     fun recent(limit: Int = 50): Flow<List<NewsEntity>>
 
+    @Query("SELECT * FROM news WHERE category = :category ORDER BY id DESC LIMIT :limit")
+    fun recentByCategory(category: String, limit: Int = 50): Flow<List<NewsEntity>>
+
     @Query("SELECT COUNT(*) FROM news WHERE read = 0")
     fun unreadCount(): Flow<Int>
 

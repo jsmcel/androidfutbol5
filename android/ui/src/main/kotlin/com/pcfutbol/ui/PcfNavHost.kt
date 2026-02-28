@@ -18,6 +18,7 @@ object Routes {
     const val LINEUP            = "/lineup"
     const val TACTIC            = "/tactic"
     const val STATS             = "/stats"
+    const val ECONOMY           = "/economy"
     const val STANDINGS         = "/standings/{comp}"
     const val MATCHDAY          = "/matchday/{round}"
     const val MATCH_RESULT      = "/match/{id}"
@@ -52,6 +53,7 @@ fun PcfNavHost() {
             LigaSelectScreen(
                 onNavigateUp = { navController.navigateUp() },
                 onStandings = { comp -> navController.navigate(Routes.standings(comp)) },
+                onEconomy = { navController.navigate(Routes.ECONOMY) },
                 onMatchday = { round -> navController.navigate(Routes.matchday(round)) },
                 onTeam = { navController.navigate(Routes.TEAM_SQUAD) },
                 onManagerDepth = { navController.navigate(Routes.MANAGER_DEPTH) },
@@ -99,6 +101,10 @@ fun PcfNavHost() {
 
         composable(Routes.STATS) {
             StatsScreen(onNavigateUp = { navController.navigateUp() })
+        }
+
+        composable(Routes.ECONOMY) {
+            FinanceScreen(onNavigateUp = { navController.navigateUp() })
         }
 
         composable(Routes.STANDINGS) { backStack ->

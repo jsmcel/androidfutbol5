@@ -69,6 +69,8 @@ class CompetitionRepository @Inject constructor(
             .filter { !it.played }
         val seasonState = seasonStateDao.get()
         val managerTeamId = seasonState?.managerTeamId ?: -1
+        var managerFixturePlayed: FixtureEntity? = null
+        var managerResult: MatchResult? = null
 
         val results = mutableListOf<MatchResult>()
         fixtures.forEach { fixture ->
@@ -91,6 +93,10 @@ class CompetitionRepository @Inject constructor(
                 matchday = matchday,
                 managerTeamId = managerTeamId,
             )
+            if (fixture.homeTeamId == managerTeamId || fixture.awayTeamId == managerTeamId) {
+                managerFixturePlayed = fixture
+                managerResult = result
+            }
             results += result
         }
 
@@ -101,6 +107,12 @@ class CompetitionRepository @Inject constructor(
         val teamIds = teamDao.byCompetition(competitionCode).first().map { it.slotId }
         val updatedStandings = StandingsCalculator.calculate(competitionCode, teamIds, allPlayedFixtures)
         standingDao.insertAll(updatedStandings)
+        applyWeeklyFinance(
+            matchday = matchday,
+            managerTeamId = managerTeamId,
+            managerFixture = managerFixturePlayed,
+            managerResult = managerResult,
+        )
 
         // Avanzar matchday en SeasonState y gestionar ventana de mercado
         val state = seasonStateDao.get()
@@ -351,6 +363,47 @@ class CompetitionRepository @Inject constructor(
             array.put(obj)
         }
         return array.toString()
+    }
+
+    private suspend fun applyWeeklyFinance(
+        matchday: Int,
+        managerTeamId: Int,
+        managerFixture: FixtureEntity?,
+        managerResult: MatchResult?,
+    ) {
+        if (managerTeamId <= 0 || managerFixture == null || managerResult == null) return
+        val team = teamDao.byId(managerTeamId) ?: return
+        val squad = playerDao.byTeamNow(managerTeamId)
+        val wagesCostK = squad.sumOf { it.wageK }.coerceAtLeast(500)
+
+        val sponsorIncomeK = (team.membersCount / 20).coerceIn(300, 7000) + team.prestige * 40
+        val homeGame = managerFixture.homeTeamId == managerTeamId
+        val attendanceIncomeK = if (homeGame) {
+            (team.membersCount / 18).coerceIn(250, 5000)
+        } else {
+            (team.membersCount / 35).coerceIn(120, 1800)
+        }
+        val resultBonusK = when {
+            homeGame && managerResult.homeGoals > managerResult.awayGoals -> 220
+            !homeGame && managerResult.awayGoals > managerResult.homeGoals -> 260
+            managerResult.homeGoals == managerResult.awayGoals -> 90
+            else -> -120
+        }
+
+        val netK = sponsorIncomeK + attendanceIncomeK + resultBonusK - wagesCostK
+        val newBudget = (team.budgetK + netK).coerceAtLeast(0)
+        teamDao.update(team.copy(budgetK = newBudget))
+
+        newsDao.insert(
+            NewsEntity(
+                date = java.time.LocalDate.now().toString(),
+                matchday = matchday,
+                category = "FINANCE",
+                titleEs = "Caja semanal ${if (netK >= 0) "+" else ""}${netK}K",
+                bodyEs = "Sponsor ${sponsorIncomeK}K + taquilla ${attendanceIncomeK}K + bonus ${resultBonusK}K - salarios ${wagesCostK}K.",
+                teamId = managerTeamId,
+            )
+        )
     }
 
     private suspend fun publishMatchNews(
