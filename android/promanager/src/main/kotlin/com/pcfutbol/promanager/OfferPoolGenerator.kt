@@ -51,10 +51,13 @@ object OfferPoolGenerator {
                 .thenByDescending { it.prestige }
         )
 
-        val candidates = if (ranked.size >= 3) {
+        val minimumStrictOffers = if (isNewSeason) 3 else 3
+        val candidates = if (ranked.size >= minimumStrictOffers) {
             ranked.take(5)
         } else {
-            relaxedCandidates(manager, allTeams, teamsWithManager).take(5)
+            (ranked + relaxedCandidates(manager, allTeams, teamsWithManager, rookieRfef2Group))
+                .distinctBy { it.slotId }
+                .take(5)
         }
 
         return candidates
@@ -74,10 +77,19 @@ object OfferPoolGenerator {
         manager: ManagerProfileEntity,
         allTeams: List<TeamEntity>,
         teamsWithManager: Set<Int>,
+        rookieRfef2Group: String?,
     ): List<TeamEntity> =
         allTeams
-            .filter { it.slotId !in teamsWithManager && isLeagueTeam(it.competitionKey) }
-            .sortedBy { abs(it.prestige - manager.prestige) }
+            .filter {
+                it.slotId !in teamsWithManager &&
+                    isLeagueTeam(it.competitionKey) &&
+                    isLeagueEligibleRelaxed(manager.prestige, it.competitionKey, rookieRfef2Group)
+            }
+            .sortedWith(
+                compareBy<TeamEntity> { leagueDistance(manager.prestige, it.competitionKey, rookieRfef2Group) }
+                    .thenBy { abs(it.prestige - manager.prestige) }
+                    .thenByDescending { it.prestige }
+            )
 
     private fun isLeagueTeam(competitionKey: String): Boolean =
         competitionKey.isNotBlank() && competitionKey !in nonLeagueCompetitions
@@ -105,6 +117,18 @@ object OfferPoolGenerator {
         }
     }
 
+    private fun isLeagueEligibleRelaxed(
+        managerPrestige: Int,
+        competitionKey: String,
+        rookieRfef2Group: String?,
+    ): Boolean = when {
+        managerPrestige <= 2 -> competitionKey in rfef2Leagues ||
+            competitionKey in rfef1Leagues ||
+            competitionKey == CompetitionDefinitions.LIGA2 ||
+            competitionKey == CompetitionDefinitions.LIGA1
+        else -> isLeagueEligible(managerPrestige, competitionKey, rookieRfef2Group)
+    }
+
     private fun leagueTier(competitionKey: String): Int = CompetitionDefinitions.competitionTier(competitionKey)
 
     private fun leagueDistance(
@@ -112,8 +136,8 @@ object OfferPoolGenerator {
         competitionKey: String,
         rookieRfef2Group: String?,
     ): Int {
-        if (managerPrestige <= 2 && competitionKey in rfef2Leagues && competitionKey == rookieRfef2Group) {
-            return 0
+        if (managerPrestige <= 2 && competitionKey in rfef2Leagues) {
+            return if (competitionKey == rookieRfef2Group) 0 else 1
         }
         val preferredTier = when {
             managerPrestige <= 2 -> 4

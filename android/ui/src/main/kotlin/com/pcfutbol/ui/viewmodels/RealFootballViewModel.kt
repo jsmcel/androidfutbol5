@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class RealStandingRow(
@@ -124,27 +125,33 @@ class RealFootballViewModel @Inject constructor() : ViewModel() {
     }
 
     private fun fetchStandings(leagueId: Int): List<RealStandingRow> {
-        val raw = httpGet("$BASE_URL/lookuptable.php?l=$leagueId&s=2024-2025")
-        val root = JSONObject(raw)
-        val table = root.optJSONArray("table") ?: return emptyList()
-        val rows = mutableListOf<RealStandingRow>()
+        for (season in seasonCandidates()) {
+            val raw = httpGet("$BASE_URL/lookuptable.php?l=$leagueId&s=$season")
+            val root = JSONObject(raw)
+            val table = root.optJSONArray("table") ?: continue
+            val rows = mutableListOf<RealStandingRow>()
 
-        for (i in 0 until table.length()) {
-            val row = table.optJSONObject(i) ?: continue
-            rows += RealStandingRow(
-                position = row.optString("intRank").toIntOrNull() ?: (i + 1),
-                teamName = row.optString("name", "Equipo"),
-                played = row.optString("played").toIntOrNull() ?: row.optInt("played", 0),
-                won = row.optString("win").toIntOrNull() ?: row.optInt("win", 0),
-                drawn = row.optString("draw").toIntOrNull() ?: row.optInt("draw", 0),
-                lost = row.optString("loss").toIntOrNull() ?: row.optInt("loss", 0),
-                goalsFor = row.optString("goalsfor").toIntOrNull() ?: row.optInt("goalsfor", 0),
-                goalsAgainst = row.optString("goalsagainst").toIntOrNull() ?: row.optInt("goalsagainst", 0),
-                points = row.optString("total").toIntOrNull() ?: row.optInt("total", 0),
-            )
+            for (i in 0 until table.length()) {
+                val row = table.optJSONObject(i) ?: continue
+                rows += RealStandingRow(
+                    position = row.optString("intRank").toIntOrNull() ?: (i + 1),
+                    teamName = row.optString("name", "Equipo"),
+                    played = row.optString("played").toIntOrNull() ?: row.optInt("played", 0),
+                    won = row.optString("win").toIntOrNull() ?: row.optInt("win", 0),
+                    drawn = row.optString("draw").toIntOrNull() ?: row.optInt("draw", 0),
+                    lost = row.optString("loss").toIntOrNull() ?: row.optInt("loss", 0),
+                    goalsFor = row.optString("goalsfor").toIntOrNull() ?: row.optInt("goalsfor", 0),
+                    goalsAgainst = row.optString("goalsagainst").toIntOrNull() ?: row.optInt("goalsagainst", 0),
+                    points = row.optString("total").toIntOrNull() ?: row.optInt("total", 0),
+                )
+            }
+
+            if (rows.isNotEmpty()) {
+                return rows.sortedBy { it.position }
+            }
         }
 
-        return rows.sortedBy { it.position }
+        return emptyList()
     }
 
     private fun fetchResults(leagueId: Int): List<RealMatchResult> {
@@ -184,6 +191,14 @@ class RealFootballViewModel @Inject constructor() : ViewModel() {
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun seasonCandidates(now: LocalDate = LocalDate.now()): List<String> {
+        val startYear = if (now.monthValue >= 7) now.year else now.year - 1
+        val current = "$startYear-${startYear + 1}"
+        val previousStart = startYear - 1
+        val previous = "$previousStart-${previousStart + 1}"
+        return listOf(current, previous)
     }
 
     private companion object {
