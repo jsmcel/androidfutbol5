@@ -636,9 +636,120 @@ def _pause():
 
 # ---- Save / Load -----------------------------------------------------------
 
-def _save_career(data: dict):
+def _save_career_raw(data: dict):
     with open(CAREER_SAVE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _clean_runtime_keys(data: dict) -> dict:
+    return {k: v for k, v in data.items() if not k.startswith("_")}
+
+
+def _default_career_payload() -> dict:
+    return {
+        "season": "2025-26",
+        "current_player_turn": 0,
+        "managers": [],
+        "shared": {
+            "turn_matchday": 1,
+            "retired_count": 0,
+        },
+    }
+
+
+def _normalize_career_payload(raw: Optional[dict]) -> dict:
+    if not isinstance(raw, dict):
+        return _default_career_payload()
+
+    # Formato nuevo multi-manager
+    if isinstance(raw.get("managers"), list):
+        career = raw
+        shared = career.get("shared")
+        if not isinstance(shared, dict):
+            shared = {}
+        shared.setdefault("turn_matchday", 1)
+        shared.setdefault("retired_count", 0)
+        career["shared"] = shared
+
+        managers = [m for m in career.get("managers", []) if isinstance(m, dict)]
+        career["managers"] = managers
+        if managers:
+            turn = int(career.get("current_player_turn", 0))
+            career["current_player_turn"] = turn % len(managers)
+            career.setdefault("season", managers[0].get("season", "2025-26"))
+            first_md = int(managers[0].get("current_matchday", 1))
+            shared["turn_matchday"] = max(1, int(shared.get("turn_matchday", first_md)))
+        else:
+            career["current_player_turn"] = 0
+            career.setdefault("season", "2025-26")
+            shared["turn_matchday"] = max(1, int(shared.get("turn_matchday", 1)))
+        return career
+
+    # Formato legacy de un solo manager
+    if isinstance(raw.get("manager"), dict):
+        legacy = dict(raw)
+        current_md = max(1, int(legacy.get("current_matchday", 1)))
+        return {
+            "season": legacy.get("season", "2025-26"),
+            "current_player_turn": 0,
+            "managers": [legacy],
+            "shared": {
+                "turn_matchday": current_md,
+                "retired_count": int(legacy.get("retired_count", 0)),
+            },
+        }
+
+    return _default_career_payload()
+
+
+def _get_active_manager_data(career: dict) -> Optional[dict]:
+    managers = career.get("managers", [])
+    if not managers:
+        return None
+    idx = int(career.get("current_player_turn", 0)) % len(managers)
+    manager_data = dict(managers[idx])
+    manager_data["_career"] = career
+    manager_data["_manager_index"] = idx
+    return manager_data
+
+
+def _is_multiplayer_context(data: dict) -> bool:
+    career = data.get("_career")
+    return isinstance(career, dict) and len(career.get("managers", [])) > 1
+
+
+def _save_career(data: dict):
+    career = data.get("_career")
+    manager_idx = data.get("_manager_index")
+
+    if isinstance(career, dict) and isinstance(manager_idx, int):
+        managers = career.get("managers", [])
+        if not isinstance(managers, list):
+            managers = []
+            career["managers"] = managers
+        while manager_idx >= len(managers):
+            managers.append({})
+
+        clean_data = _clean_runtime_keys(data)
+        managers[manager_idx] = clean_data
+
+        shared = career.get("shared")
+        if not isinstance(shared, dict):
+            shared = {}
+            career["shared"] = shared
+        shared["retired_count"] = max(
+            int(shared.get("retired_count", 0)),
+            int(clean_data.get("retired_count", 0)),
+        )
+
+        if clean_data.get("season"):
+            career["season"] = clean_data["season"]
+        turn = int(career.get("current_player_turn", 0))
+        career["current_player_turn"] = turn % max(len(managers), 1)
+        _save_career_raw(career)
+        return
+
+    _save_career_raw(data)
 
 
 def _load_career() -> Optional[dict]:
@@ -649,6 +760,153 @@ def _load_career() -> Optional[dict]:
             return json.load(f)
     except Exception:
         return None
+
+
+def _advance_multiplayer_turn(data: dict, played_matchday: int):
+    career = data.get("_career")
+    manager_idx = data.get("_manager_index")
+    if not isinstance(career, dict) or not isinstance(manager_idx, int):
+        return
+    managers = career.get("managers", [])
+    if not isinstance(managers, list) or len(managers) <= 1:
+        return
+
+    last_turn_played = max(int(data.get("last_turn_played", 0)), played_matchday)
+    data["last_turn_played"] = last_turn_played
+    clean_data = _clean_runtime_keys(data)
+    clean_data["last_turn_played"] = last_turn_played
+    managers[manager_idx] = clean_data
+
+    shared = career.get("shared")
+    if not isinstance(shared, dict):
+        shared = {}
+        career["shared"] = shared
+    turn_md = max(1, int(shared.get("turn_matchday", played_matchday)))
+
+    everyone_played = all(int(m.get("last_turn_played", 0)) >= turn_md for m in managers if isinstance(m, dict))
+    if everyone_played:
+        next_md = turn_md + 1
+        shared["turn_matchday"] = next_md
+        for m in managers:
+            if not isinstance(m, dict):
+                continue
+            m["current_matchday"] = max(int(m.get("current_matchday", next_md)), next_md)
+    else:
+        shared["turn_matchday"] = turn_md
+
+    career["current_player_turn"] = (manager_idx + 1) % len(managers)
+
+
+def _season_year(season: str) -> int:
+    try:
+        return int(str(season).split("-")[0])
+    except Exception:
+        return 2025
+
+
+def _player_snapshot_from_team_player(player: Player, team: Team, season_year: int) -> dict:
+    birth_year = season_year - max(player.age, 15)
+    return {
+        "name": player.name,
+        "position": player.position,
+        "birth_year": birth_year,
+        "ve": player.ve,
+        "re": player.re,
+        "ag": player.ag,
+        "ca": player.ca,
+        "remate": player.remate,
+        "regate": player.regate,
+        "pase": player.pase,
+        "tiro": player.tiro,
+        "entrada": player.entrada,
+        "portero": player.portero,
+        "market_value": player.market_value,
+        "team_slot_id": team.slot_id,
+        "status": "OK",
+    }
+
+
+def _build_players_snapshot(liga1: list[Team], liga2: list[Team], season: str) -> list[dict]:
+    season_year = _season_year(season)
+    players: list[dict] = []
+    for team in liga1 + liga2:
+        for player in team.players:
+            players.append(_player_snapshot_from_team_player(player, team, season_year))
+    return players
+
+
+def _apply_season_development(data: dict) -> None:
+    """Aplica evolucion/retiro de jugadores tras fin de temporada."""
+    players = data.get("players", [])
+    if not isinstance(players, list):
+        return
+
+    season_str = str(data.get("season", "2025-26"))
+    year = _season_year(season_str)
+    season_hash = sum((i + 1) * ord(ch) for i, ch in enumerate(season_str))
+    seed = int(data.get("season_seed", 0)) ^ season_hash
+    rng = random.Random(seed)
+    attrs = ["ve", "re", "ag", "ca", "remate", "regate", "pase", "tiro", "entrada", "portero"]
+
+    retired_now = 0
+    for p in players:
+        if not isinstance(p, dict):
+            continue
+        birth_year = int(p.get("birth_year", year - 22))
+        age = year - birth_year
+
+        if age >= 37 or (age >= 35 and int(p.get("ve", 50)) <= 30):
+            if p.get("status") != "RETIRED":
+                retired_now += 1
+            p["status"] = "RETIRED"
+        elif age < 24:
+            improve_count = rng.randint(1, 3)
+            for attr in rng.sample(attrs, k=improve_count):
+                p[attr] = min(99, int(p.get(attr, 50)) + rng.randint(1, 3))
+        elif age >= 31:
+            delta = 2 if age >= 34 else 1
+            p["ve"] = max(1, int(p.get("ve", 50)) - delta)
+            p["re"] = max(1, int(p.get("re", 50)) - delta)
+        else:
+            # Prime: pequena oscilacion aleatoria en 0..2 atributos
+            for attr in rng.sample(attrs, k=rng.randint(0, 2)):
+                p[attr] = max(0, min(99, int(p.get(attr, 50)) + rng.randint(-1, 1)))
+
+    manager_team = data.get("manager_team")
+    if not isinstance(manager_team, dict):
+        manager_team = {"slot_id": data.get("team_slot")}
+    manager_slot = manager_team.get("slot_id")
+    if isinstance(manager_slot, int) and manager_slot > 0:
+        for _ in range(2):
+            players.append({
+                "name": f"Cantera {rng.randint(100, 999)}",
+                "position": rng.choice(["Defender", "Midfielder", "Forward"]),
+                "birth_year": year - rng.randint(16, 18),
+                "ve": rng.randint(35, 50),
+                "re": rng.randint(35, 50),
+                "ag": rng.randint(30, 55),
+                "ca": rng.randint(35, 55),
+                "remate": rng.randint(20, 45),
+                "regate": rng.randint(20, 45),
+                "pase": rng.randint(25, 50),
+                "tiro": rng.randint(20, 45),
+                "entrada": rng.randint(25, 50),
+                "portero": 0,
+                "team_slot_id": manager_slot,
+                "status": "OK",
+                "market_value": rng.randint(100_000, 600_000),
+            })
+
+    data["players"] = [p for p in players if isinstance(p, dict) and p.get("status") != "RETIRED"]
+    data["retired_count"] = int(data.get("retired_count", 0)) + retired_now
+
+    career = data.get("_career")
+    if isinstance(career, dict):
+        shared = career.get("shared")
+        if not isinstance(shared, dict):
+            shared = {}
+            career["shared"] = shared
+        shared["retired_count"] = int(shared.get("retired_count", 0)) + retired_now
 
 
 # ---- Standings from saved results ------------------------------------------
@@ -842,6 +1100,7 @@ def _season_end_screen(data: dict, standings: list[Standing], mgr_slot: int,
         "objective": data["objective"],
         "met":       met,
     })
+    _apply_season_development(data)
     data["phase"] = "POSTSEASON"
     _save_career(data)
     _pause()
@@ -1523,12 +1782,24 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
 
     # Apply saved squad changes (fichajes/ventas)
     _apply_squad_changes(mgr_team, all_slots, data)
+    data.setdefault("players", _build_players_snapshot(liga1, liga2, data.get("season", "2025-26")))
 
     # Build fixture map (deterministic, sorted by slot_id)
     all_fix    = generate_fixtures(comp_t)
     fix_by_md: dict[int, list[tuple[Team, Team]]] = {}
     for i, pair in enumerate(all_fix):
         fix_by_md.setdefault((i // fpm) + 1, []).append(pair)
+
+    is_multiplayer = _is_multiplayer_context(data)
+    if is_multiplayer:
+        shared = data.get("_career", {}).get("shared", {})
+        turn_md = int(shared.get("turn_matchday", data.get("current_matchday", 1)))
+        last_played = int(data.get("last_turn_played", 0))
+        if last_played >= turn_md:
+            print(_c(GRAY, f"\n  {data['manager']['name']} ya jugo su turno en la jornada {turn_md}."))
+            _pause()
+            return
+        data["current_matchday"] = turn_md
 
     results = data.setdefault("results", [])
     news    = data.setdefault("news", [])
@@ -1555,7 +1826,10 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
         print(_c(CYAN,  "  2. Clasificación completa"))
         print(_c(CYAN,  "  3. Plantilla"))
         print(_c(CYAN,  "  4. Noticias"))
-        print(_c(CYAN,  "  5. Simular resto de temporada"))
+        if is_multiplayer:
+            print(_c(GRAY,  "  5. Simular resto de temporada [NO DISPONIBLE EN MULTI]"))
+        else:
+            print(_c(CYAN,  "  5. Simular resto de temporada"))
         print(_c(CYAN,  f"  6. Mercado de fichajes {win_tag}"))
         print(_c(CYAN,  "  7. Táctica"))
         print(_c(CYAN,  "  0. Guardar y salir"))
@@ -1598,8 +1872,13 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
                 print(_c(YELLOW, f"  📰 {ni}\n"))
             cur_md += 1
             data["current_matchday"] = cur_md
+            if is_multiplayer:
+                _advance_multiplayer_turn(data, played_matchday=cur_md - 1)
             _save_career(data)
             _pause()
+            if is_multiplayer:
+                print(_c(CYAN, "  Turno completado. Pasa al siguiente manager.\n"))
+                return
 
         elif op == 2:
             label = "PRIMERA" if is_l1 else "SEGUNDA"
@@ -1625,6 +1904,9 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team]):
             tactic = data.get("tactic", tactic)
 
         elif op == 5:
+            if is_multiplayer:
+                print(_c(RED, "  Esta opción está deshabilitada en modo multijugador por turnos.\n"))
+                continue
             print(_c(YELLOW, f"\n  Simulando jornadas {cur_md}–{tot_md}..."))
             for md in range(cur_md, tot_md + 1):
                 for h, a in fix_by_md.get(md, []):
@@ -1669,7 +1951,9 @@ def _setup_season(data: dict, team: Team, liga1: list[Team], liga2: list[Team], 
         "sold":             [],
         "results":          [],
         "news":             [f"Inicio de temporada {season}. {m['name']} llega a {team.name}."],
+        "manager_team":     {"slot_id": team.slot_id, "name": team.name},
     })
+    data.setdefault("players", _build_players_snapshot(liga1, liga2, season))
     _save_career(data)
 
 
@@ -1692,62 +1976,170 @@ def _show_offers(data: dict, liga1: list[Team], liga2: list[Team]) -> Optional[T
 
 # ---- Entry point -----------------------------------------------------------
 
+def _new_manager_state(name: str, season: str) -> dict:
+    return {
+        "manager": {
+            "name": name,
+            "prestige": 1,
+            "total_seasons": 0,
+            "history": [],
+        },
+        "season": season,
+        "phase": "NEW",
+        "current_matchday": 1,
+        "retired_count": 0,
+    }
+
+
+def _remove_active_manager(career: dict):
+    managers = career.get("managers", [])
+    if not managers:
+        return
+    idx = int(career.get("current_player_turn", 0)) % len(managers)
+    del managers[idx]
+    if managers:
+        career["current_player_turn"] = idx % len(managers)
+    else:
+        career["current_player_turn"] = 0
+
+
 def menu_promanager(liga1: list[Team], liga2: list[Team]):
     print(_c(BOLD + CYAN, "\n  ╔══════════════════════════════════╗"))
     print(_c(BOLD + CYAN, "  ║       MODO PRO MANAGER           ║"))
     print(_c(BOLD + CYAN, "  ╚══════════════════════════════════╝"))
 
-    data = _load_career()
+    career = _normalize_career_payload(_load_career())
+    data = _get_active_manager_data(career)
 
     if data:
-        m = data["manager"]
-        print(_c(YELLOW, f"\n  Partida guardada — {m['name']}  {_prestige_label(m['prestige'])}"))
+        m = data.get("manager", {})
+        print(_c(YELLOW, f"\n  Partida guardada — {m.get('name','?')}  {_prestige_label(int(m.get('prestige', 1)))}"))
         print(f"  {data.get('season','?')}  ·  {data.get('team_name','?')}  ·  J{data.get('current_matchday',1)}")
+        if _is_multiplayer_context(data):
+            turn_md = int(career.get("shared", {}).get("turn_matchday", data.get("current_matchday", 1)))
+            print(_c(CYAN, f"  Turno activo: jornada compartida {turn_md}"))
         print()
+
+        # Manager creado pero sin equipo: configurar primera temporada
+        if data.get("phase") == "NEW" or not data.get("team_slot"):
+            team = _show_offers(data, liga1, liga2)
+            _setup_season(data, team, liga1, liga2, data.get("season", career.get("season", "2025-26")))
+            print(_c(GREEN, f"\n  ¡{m.get('name','Manager')} comienza en {team.name}!"))
+            print(_c(YELLOW, f"  Objetivo: {data['objective']}"))
+            _pause()
+            _season_loop(data, liga1, liga2)
+            return
+
         if data.get("phase") == "POSTSEASON":
             print(_c(CYAN, "  1. Nueva temporada (nuevas ofertas)"))
-            print(_c(CYAN, "  2. Borrar y crear nuevo manager"))
+            print(_c(CYAN, "  2. Borrar manager activo"))
             print(_c(CYAN, "  0. Volver"))
             op = input_int("  Opción: ", 0, 2)
             if op == 0:
                 return
-            elif op == 1:
+            if op == 1:
                 team = _show_offers(data, liga1, liga2)
                 _setup_season(data, team, liga1, liga2, _next_season_str(data["season"]))
-                print(_c(GREEN,  f"\n  ¡{m['name']} ficha por {team.name}!"))
+                print(_c(GREEN, f"\n  ¡{m.get('name','Manager')} ficha por {team.name}!"))
                 print(_c(YELLOW, f"  Objetivo: {data['objective']}"))
                 _pause()
                 _season_loop(data, liga1, liga2)
                 return
-            else:
-                data = None
-        else:
-            print(_c(CYAN, "  1. Continuar partida"))
-            print(_c(CYAN, "  2. Borrar y crear nuevo manager"))
-            print(_c(CYAN, "  0. Volver"))
-            op = input_int("  Opción: ", 0, 2)
-            if op == 0:
-                return
-            elif op == 1:
-                _season_loop(data, liga1, liga2)
-                return
-            else:
-                data = None
+            _remove_active_manager(career)
+            _save_career_raw(career)
+            return
 
-    # Crear nuevo manager
+        print(_c(CYAN, "  1. Continuar partida"))
+        print(_c(CYAN, "  2. Borrar manager activo"))
+        print(_c(CYAN, "  0. Volver"))
+        op = input_int("  Opción: ", 0, 2)
+        if op == 0:
+            return
+        if op == 1:
+            _season_loop(data, liga1, liga2)
+            return
+        _remove_active_manager(career)
+        _save_career_raw(career)
+        return
+
+    # Crear primer manager si no existe ninguno
     print(_c(BOLD + YELLOW, "\n  ─── NUEVO MANAGER ───"))
     name = input_str("  Nombre del manager: ")
     if not name:
         return
-    data = {"manager": {"name": name, "prestige": 1, "total_seasons": 0, "history": []}}
+    season = career.get("season", "2025-26")
+    career.setdefault("managers", []).append(_new_manager_state(name, season))
+    career["current_player_turn"] = len(career["managers"]) - 1
+    _save_career_raw(career)
+    menu_promanager(liga1, liga2)
 
-    team = _show_offers(data, liga1, liga2)
-    _setup_season(data, team, liga1, liga2, "2025-26")
-    m = data["manager"]
-    print(_c(GREEN,  f"\n  ¡Bienvenido a {team.name}, {m['name']}!"))
-    print(_c(YELLOW, f"  Objetivo de la junta: {data['objective']}"))
-    _pause()
-    _season_loop(data, liga1, liga2)
+
+def menu_multiplayer(liga1: list[Team], liga2: list[Team]):
+    print(_c(BOLD + CYAN, "\n  ╔══════════════════════════════════╗"))
+    print(_c(BOLD + CYAN, "  ║      MULTIJUGADOR POR TURNOS     ║"))
+    print(_c(BOLD + CYAN, "  ╚══════════════════════════════════╝"))
+
+    while True:
+        career = _normalize_career_payload(_load_career())
+        managers = career.get("managers", [])
+        shared = career.get("shared", {})
+        turn_md = int(shared.get("turn_matchday", 1))
+        active_idx = int(career.get("current_player_turn", 0)) if managers else 0
+
+        print(_c(YELLOW, f"\n  Jornada compartida: {turn_md}"))
+        if not managers:
+            print(_c(GRAY, "  No hay managers creados."))
+        else:
+            print(_c(GRAY, "  Managers:"))
+            for i, m in enumerate(managers, 1):
+                mgr = m.get("manager", {})
+                marker = "▶" if (i - 1) == active_idx else " "
+                team = m.get("team_name", "Sin equipo")
+                md = m.get("current_matchday", 1)
+                print(f"  {marker} {i}. {mgr.get('name','?'):<16}  {team:<20}  J{md}")
+
+        print()
+        print(_c(CYAN, "  1. Jugar turno activo"))
+        print(_c(CYAN, "  2. Seleccionar manager activo"))
+        print(_c(CYAN, "  3. Añadir manager"))
+        print(_c(CYAN, "  4. Borrar manager activo"))
+        print(_c(CYAN, "  0. Volver"))
+
+        op = input_int("  Opción: ", 0, 4)
+        if op == 0:
+            return
+        if op == 1:
+            if not managers:
+                print(_c(RED, "  No hay managers para jugar.\n"))
+                continue
+            _save_career_raw(career)
+            menu_promanager(liga1, liga2)
+            continue
+        if op == 2:
+            if not managers:
+                print(_c(RED, "  No hay managers creados.\n"))
+                continue
+            idx = input_int(f"  Selecciona manager (1-{len(managers)}): ", 1, len(managers))
+            career["current_player_turn"] = idx - 1
+            _save_career_raw(career)
+            continue
+        if op == 3:
+            name = input_str("  Nombre del nuevo manager: ")
+            if not name:
+                continue
+            season = career.get("season", "2025-26")
+            career.setdefault("managers", []).append(_new_manager_state(name, season))
+            career["current_player_turn"] = len(career["managers"]) - 1
+            _save_career_raw(career)
+            print(_c(GREEN, "  Manager añadido. Configura su equipo en el siguiente turno.\n"))
+            continue
+        if op == 4:
+            if not managers:
+                print(_c(RED, "  No hay managers para borrar.\n"))
+                continue
+            _remove_active_manager(career)
+            _save_career_raw(career)
+            print(_c(GREEN, "  Manager borrado.\n"))
 
 
 # ===========================================================================
@@ -1781,10 +2173,11 @@ def main_menu():
         print(_c(CYAN,   "  │  4. Top jugadores                │"))
         print(_c(CYAN,   "  │  5. Ranking de fortaleza         │"))
         print(_c(BOLD + CYAN, "  │  6. PRO MANAGER (modo carrera)  │"))
+        print(_c(BOLD + CYAN, "  │  7. MULTIJUGADOR por turnos     │"))
         print(_c(CYAN,   "  │  0. Salir                        │"))
         print(_c(CYAN,   "  └──────────────────────────────────┘"))
 
-        op = input_int("  Opción: ", 0, 6)
+        op = input_int("  Opción: ", 0, 7)
         if op == 0:
             print(_c(GRAY, "\n  ¡Hasta la próxima temporada!\n"))
             break
@@ -1800,6 +2193,8 @@ def main_menu():
             menu_team_strength(liga1, liga2)
         elif op == 6:
             menu_promanager(liga1, liga2)
+        elif op == 7:
+            menu_multiplayer(liga1, liga2)
 
 
 if __name__ == "__main__":

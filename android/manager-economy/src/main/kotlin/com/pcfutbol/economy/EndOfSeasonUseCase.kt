@@ -156,6 +156,7 @@ class EndOfSeasonUseCase @Inject constructor(
      */
     suspend fun applyEndOfSeason(summary: SeasonSummary) {
         val state = seasonStateDao.get() ?: return
+        if (state.phase == "POSTSEASON") return
 
         summary.relegated.forEach { tr ->
             val team = teamDao.byId(tr.teamId) ?: return@forEach
