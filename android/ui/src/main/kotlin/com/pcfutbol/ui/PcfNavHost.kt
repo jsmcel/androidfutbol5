@@ -13,6 +13,7 @@ object Routes {
     const val SELECCION         = "/seleccion"
     const val PROMANAGER_OFFERS = "/promanager/offers"
     const val TEAM_SQUAD        = "/team"
+    const val CONTRACTS         = "/contracts"
     const val MANAGER_DEPTH     = "/manager-depth"
     const val LINEUP            = "/lineup"
     const val TACTIC            = "/tactic"
@@ -76,7 +77,12 @@ fun PcfNavHost() {
                 onNavigateUp = { navController.navigateUp() },
                 onLineup = { navController.navigate(Routes.LINEUP) },
                 onTactic = { navController.navigate(Routes.TACTIC) },
+                onContracts = { navController.navigate(Routes.CONTRACTS) },
             )
+        }
+
+        composable(Routes.CONTRACTS) {
+            ContractsScreen(onNavigateUp = { navController.navigateUp() })
         }
 
         composable(Routes.MANAGER_DEPTH) {

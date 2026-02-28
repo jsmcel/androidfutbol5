@@ -31,6 +31,7 @@ fun TeamSquadScreen(
     onNavigateUp: () -> Unit,
     onLineup: () -> Unit,
     onTactic: () -> Unit,
+    onContracts: () -> Unit,
     vm: TeamSquadViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsState()
@@ -161,6 +162,13 @@ fun TeamSquadScreen(
                 color = DosCyan,
             )
         }
+        Spacer(Modifier.height(8.dp))
+        DosButton(
+            text = "CONTRATOS",
+            onClick = onContracts,
+            modifier = Modifier.fillMaxWidth(),
+            color = DosYellow,
+        )
     }
 
     // Player detail dialog
