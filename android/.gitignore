@@ -1,0 +1,13 @@
+*.iml
+.gradle/
+.idea/
+local.properties
+.DS_Store
+/build/
+*/build/
+*/*/build/
+*/*/*/build/
+*.hprof
+qa_screenshots/
+ui_dump*.xml
+ui_*.xml

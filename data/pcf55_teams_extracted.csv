@@ -1,0 +1,261 @@
+index,start,size,uid_hex,team_name,team_pos,team_len,stadium_name,stadium_pos,stadium_len,full_name,full_pos,full_len,confidence,candidate_preview
+1,1458,1207,5e 69 76 03,At. Madrid,42,10,Metro.,54,11,,,,0.90,At. Madrid | Metro. | SK Stabil Fenster Sturm Graz | Ivica Osim
+2,2665,3157,5f 68 75 01,Espanyol,42,8,RCDE Std.,52,18,,,,0.90,Espanyol | RCDE Std. | U.E.A.Gramenet | awaAntonio Morales
+3,5822,1245,5f 61 76 02,Athletic,42,9,San Mames,53,11,,,,0.90,Athletic | San Mames | Halmstads Bollkubb | Tom Prahl
+4,7067,2852,5f 69 72 06,R.B.,42,5,La Cartuja,49,10,Zalla Unión Club,62,16,1.00,R.B. | La Cartuja | Zalla Unión Club | José Manuel Garai Akasuso
+5,9919,2933,5f 69 72 03,Alaves,42,10,Mendi.,54,11,Real Zaragoza B,68,15,1.00,Alaves | Mendi. | Real Zaragoza B | José Solans
+6,12852,39675,5f 68 77 00,Real Madrid,42,11,Santiago Bernabeu,55,20,"Club de Fútbol Extremadura, S.A.D.",78,34,1.00,"Real Madrid | Santiago Bernabeu | Club de Fútbol Extremadura, S.A.D. | xaasaPe"
+7,52527,2370,5f 68 75 09,Mallorca,42,8,Mallorca Son Moix,52,18,Talavera Club de Fútbol,73,23,1.00,Mallorca | Mallorca Son Moix | Talavera Club de Fútbol | Ignacio Valero Corrochano
+8,54897,3751,5f 69 71 03,Barcelona,42,10,Camp Nou,54,8,Real Club Deportivo Espanyol B,65,30,1.00,Barcelona | Camp Nou | Real Club Deportivo Espanyol B | Framcesc Perelló Dotti
+9,58648,71027,5f 68 73 03,Sevilla,42,8,R.S.,52,11,"Real Zaragoza, S.A.D.",66,21,1.00,"Sevilla | R.S. | Real Zaragoza, S.A.D. | Alfonso Solans Solans"
+10,129675,2469,5f 69 70 04,Girona,42,7,Montilivi,51,9,,,,0.90,Girona | Montilivi | S.D Zamudio | José Felix Torre Etxegaray
+11,132144,1184,5f 6d 72 01,Val.,42,5,Mestalla,49,9,Nimes Olympique,61,15,1.00,Val. | Mestalla | Nimes Olympique | Mosca
+12,133328,1258,5f 60 73 03,C.E.,42,4,N.S.,48,9,,,,0.90,C.E. | N.S. | Roda JC | Huub Stevens
+13,134586,2472,5f 69 71 08,Huesca,42,9,Alcoraz,53,9,,,,0.90,Huesca | Alcoraz | Unión Deportiva San Pedro | Antonio Morales Reula
+14,137058,34541,5f 68 70 09,R.O.,42,6,C.T.,50,7,Club Deportivo Orense,60,21,1.00,R.O. | C.T. | Club Deportivo Orense | ataManuel R
+15,171599,2933,5f 69 71 02,J.T.C.,48,9,El Pozuelo,95,12,Club de Fútbol Gavá,60,19,1.00,J.T.C. | Club de Fútbol Gavá | El Pozuelo | Patrocinador
+16,174532,42797,5f 68 70 05,Levante,42,7,Ciutat Valencia,51,19,"Club Deportivo Leganés, S.A.D.",73,30,1.00,"Levante | Ciutat Valencia | Club Deportivo Leganés, S.A.D. | araJe"
+17,217329,3384,5f 69 72 01,Getafe,42,7,Coliseum,51,8,Club Deportivo Aurrerá,62,22,1.00,Getafe | Coliseum | Club Deportivo Aurrerá | Javier Knörr Elorza
+18,220713,3460,5f 68 74 01,Celta,42,5,A.B.,49,6,Xerez Club Deportivo,58,20,1.00,Celta | A.B. | Xerez Club Deportivo | Manuel Riquelme Ruiz
+19,224173,665,56 61 76 00,R.M.C.,42,16,Alfredo Di Stéfano,60,25,,,,0.90,R.M.C. | Alfredo Di Stéfano | aaa | Sin datos.
+20,224838,3188,5f 68 7a 09,Osasuna,42,11,El Sar,55,6,Real Club Deportivo B,64,21,1.00,Osasuna | El Sar | Real Club Deportivo B | Augusto César Lendoiro
+21,228026,62036,5f 68 72 08,V.C.,42,8,Ceram.,52,6,"Reial Club Deportiu Espanyol, S.A.D.",61,36,1.00,"V.C. | Ceram. | Reial Club Deportiu Espanyol, S.A.D. | Francesc Perelló Picchi"
+22,290062,1177,5e 60 73 05,Valladolid,49,13,Fassler,285,7,Football Club de Vaduz,65,22,1.00,Valladolid | Football Club de Vaduz | Fassler | G.F.
+23,291239,1167,5f 6d 73 02,Grana.,42,6,Nuevo Los Carme.,50,16,,,,0.90,Grana. | Nuevo Los Carme. | Paris Saint Germain F. C. | Bats
+24,292406,56125,5f 68 71 05,Albacete,42,8,C.B.,52,11,"Real Club Deportivo Mallorca, S.A.D.",66,36,1.00,"Albacete | C.B. | Real Club Deportivo Mallorca, S.A.D. | Bartolomé Beltrán"
+25,348531,55955,5f 68 71 09,Burgos,42,6,El Plantio,50,17,"Mérida Club Polideportivo , S.A.D.",70,34,1.00,"Burgos | El Plantio | Mérida Club Polideportivo , S.A.D. | araJosé Fouto Carva"
+26,404486,1925,56 68 73 01,Racing,84,25,Jokin Ezkieta,325,26,eaH.  raManu Hernando      eacfaaa,578,34,1.00,Racing | ae | Jokin Ezkieta | Eriksson
+27,406411,48045,5f 68 71 08,R. Sociedad,42,11,Josep Lluis Núñez Clemente,109,26,Reale Ar.,55,10,1.00,R. Sociedad | Reale Ar. | Josep Lluis Núñez Clemente | No tiene
+28,454456,35663,5f 68 70 00,Eibar,42,5,Ipurua,49,19,Sociedad Deportiva Eibar S.A.D.,71,31,1.00,Eibar | Ipurua | Sociedad Deportiva Eibar S.A.D. | Juan Luis Mardaras Intxausti
+29,490119,3231,5f 68 7b 04,Cordoba,42,7,Nuevo Arcangel,51,14,,,,0.90,Cordoba | Nuevo Arcangel | Unión Deportiva Melilla | Diego Bernal Pérez
+30,493350,1259,5f 61 76 01,Andorra,42,8,E.N.d.,52,6,,,,0.90,Andorra | E.N.d. | Idrottsföreningen Kamraterna Göteborg | Jingblad
+31,494609,52699,5f 68 72 00,Leganes,42,8,Butarque,52,25,"Club Deportivo Tenerife, S.A.D.",80,31,1.00,"Leganes | Butarque | Club Deportivo Tenerife, S.A.D. | José Javier Pérez Pérez"
+32,547308,1220,5f 60 73 02,CD Teruel,42,9,Pinilla,53,9,Sportclub Feyenoord,65,19,1.00,CD Teruel | Pinilla | Sportclub Feyenoord | Arie Haan
+33,549749,3131,5f 68 7a 02,Merida AD,42,11,R.J.F.,55,10,Club Gimnástic de Tarragona,68,27,1.00,Merida AD | R.J.F. | Club Gimnástic de Tarragona | Jordi Gonzalvo
+34,552880,1200,5f 6d 72 00,Barakaldo CF,48,16,Muller,286,6,Football Club de Metz,67,21,1.00,Barakaldo CF | Football Club de Metz | Muller | Ispizua
+35,554080,1198,5e 69 76 02,Dep. Coruna,42,11,Abanca Riazor,55,15,,,,0.90,Dep. Coruna | Abanca Riazor | Sportklub Rapid Viena | Ernst Dokupil
+36,555278,1162,5e 6d 76 03,Zaragoza,42,10,Est.,54,7,,,,0.90,Zaragoza | Est. | F. C. Chemlon Humené | Danko
+37,556440,39066,5f 68 76 00,C.E.,42,7,Nuevo Pepico Amat,51,20,"Almería Club de Fútbol, S.A.D",74,29,1.00,"C.E. | Nuevo Pepico Amat | Almería Club de Fútbol, S.A.D | azaGuillermo Blanes"
+38,595506,2031,5f 69 70 07,Sporting,42,10,El Mol,54,6,Real Sociedad Deportiva Alcalá,63,30,1.00,Sporting | El Mol | Real Sociedad Deportiva Alcalá | José María Benedicto
+39,597537,1339,5d 60 73 04,Almeria,42,9,U.A.S.,53,7,Sao Paulo Futebol Clube,63,23,1.00,Almeria | U.A.S. | Sao Paulo Futebol Clube | ÆanaaaMa
+40,598876,1180,5e 68 73 04,R.V.,42,10,E.V.,54,10,,,,0.90,R.V. | E.V. | Fenerbahce Spor Kulübü | Lazaroni
+41,600056,1709,5f 6b 73 08,Sevil. Atl.,42,11,J.N.,55,10,Aston Villa Football Club,68,25,1.00,Sevil. Atl. | J.N. | Aston Villa Football Club | Little
+42,601765,1188,5f 60 76 07,CP Cacereno,42,12,Princ. Felipe,56,14,,,,0.90,CP Cacereno | Princ. Felipe | KSV Círculo de Brujas | Tipuric
+43,602953,1267,5e 6e 76 02,Malaga,42,13,Rosale,57,8,,,,0.90,Malaga | Rosale | Apoel Nicosia F. C. | Yanchev Gmoch
+44,604220,40545,5f 69 70 03,Hercu. CF,42,10,Jose Rico Perez,54,17,da en el club y tra,729,19,1.00,Hercu. CF | Jose Rico Perez | Jesús Gil y Gil | Marbella
+45,644765,1212,5f 60 76 08,Ponte. CF,42,9,Pasaron,53,15,,,,0.90,Ponte. CF | Pasaron | RWD Molenbeek | René Vandereycken
+46,645977,41297,5f 68 71 04,R.F.,42,6,A Malata,50,17,"Club Deportivo Toledo, S.A.D.",70,29,1.00,"R.F. | A Malata | Club Deportivo Toledo, S.A.D. | ayaEmilia"
+47,687274,1256,5f 6f 76 05,CD Lugo,42,10,A.C.,54,9,,,,0.90,CD Lugo | A.C. | Lokomotiv Moscú | Semine
+48,688530,1461,5f 6a 72 05,U.L.P.,42,10,E.G.C.,54,8,,,,0.90,U.L.P. | E.G.C. | Associazione Calcio Fiorentina | Ranieri
+49,689991,1238,5f 6c 73 02,Marbella FC,42,11,M.M.,55,9,,,,0.90,Marbella FC | M.M. | VFL 1900 Borussia Moenchengladbach | Bernd Krauss
+50,691229,1204,5e 6a 73 07,Caste.,42,6,SkyFi Castalia,50,14,Lyngby Fodbold Club,67,19,1.00,Caste. | SkyFi Castalia | Lyngby Fodbold Club | Benny Lennartsson
+51,692433,3207,5f 68 74 06,Cadiz,42,9,N.M.,53,9,Barakaldo Club de Fútbol,65,24,1.00,Cadiz | N.M. | Barakaldo Club de Fútbol | Roberto Gijón Fernández
+52,695640,1522,5f 6b 73 03,CE Sabad. FC,42,13,N.C.A.,57,12,,,,0.90,CE Sabad. FC | N.C.A. | Manchester United F. C. | Ferguson
+53,697162,3118,5f 68 7a 03,Bilbao Ath.,42,12,Instalaciones Lezama,56,20,Polideportivo Almería,79,21,1.00,Bilbao Ath. | Instalaciones Lezama | Polideportivo Almería | Pedro Antonio de Alarcón
+54,700280,1535,5f 6b 73 05,SD Ponfe.,42,9,Toralin,53,7,Liverpool Football Club,63,23,1.00,SD Ponfe. | Toralin | Liverpool Football Club | Evans
+55,701815,1196,5f 61 73 04,R.S.B.,42,7,I.Z.,51,7,,,,0.90,R.S.B. | I.Z. | F. C. Varteks Varadzin | Stilinovic
+56,703011,3533,5f 68 70 04,C.T.R.,42,10,El Pra,54,9,Athletic Club de Bilbao B,66,25,1.00,C.T.R. | El Pra | Athletic Club de Bilbao B | José María Arrate Llosa
+57,706544,63113,5f 68 72 03,U.C.,42,8,Reina Sofia,52,15,Albacete Balompié S.A.D.,70,24,1.00,U.C. | Reina Sofia | Albacete Balompié S.A.D. | Agustín Argandoña
+58,769657,55456,5f 68 72 09,Ar.s,42,5,Gobela,49,17,"Real Betis Balompié, S.A.D.",69,27,1.00,"Ar.s | Gobela | Real Betis Balompié, S.A.D. | Manuel Ruiz de Lopera"
+59,825113,3467,5f 68 7b 05,C.G.,42,7,Pedro Escar.,51,12,Granada Club de Fútbol,66,22,1.00,C.G. | Pedro Escar. | Granada Club de Fútbol | Cándido Gómez Alvarez
+60,828580,1142,5e 68 73 01,A.S.C.,42,8,El Palmar,60,25,,,,0.90,A.S.C. | El Palmar | Rasim Kara | Pavón
+61,829722,3798,5f 68 7b 02,R.A.I.,42,8,Roman Suarez Puerta,52,19,Terrassa Club de Fútbol,74,23,1.00,R.A.I. | Roman Suarez Puerta | Terrassa Club de Fútbol | Miquel Caparrós García
+62,833520,3069,5f 69 70 00,CD Arent.,42,9,O Espine,53,15,Sevilla B Club de Fútbol,71,24,1.00,CD Arent. | O Espine | Sevilla B Club de Fútbol | José Martín Baena
+63,836589,3361,5f 68 7b 06,G.T.,42,10,N.E.C.D.,54,9,,,,0.90,G.T. | N.E.C.D. | Recreativo de Huelva | Diego de la Villa Ortíz
+64,839950,3838,5f 69 73 00,Brondby IF,42,10,Brønd. Std.,54,11,Real Club Deportivo Mallorca,68,28,1.00,Brondby IF | Brønd. Std. | Real Club Deportivo Mallorca | Bartolomé Beltrán
+65,845009,3233,5f 68 76 04,B.D.B.,42,7,Ciud D,51,6,Real Sociedad B,605,15,1.00,B.D.B. | Ciud D | Sociedad Deportiva Beasaín | Peio Guibelalde
+66,848242,55900,5f 68 70 08,Brent. FC,42,9,Gtech Commu. Std.,53,18,"Unión Deportiva Salamanca, S.A.D.",74,33,1.00,"Brent. FC | Gtech Commu. Std. | Unión Deportiva Salamanca, S.A.D. | Juan José Hidalgo Acera"
+67,904142,1215,5f 6c 73 01,W.W.,42,11,M.S.,55,9,,,,0.90,W.W. | M.S. | BV Borussia Dortmund 09 e.V. | Ottmar Hitzfeld
+68,905357,44016,5f 68 71 02,F.R.,42,6,Kappa,151,5,"Unió Esportiva Lleida, S.A.D.",67,29,1.00,"F.R. | Unió Esportiva Lleida, S.A.D. | Kappa | b7c"
+69,949373,3392,5f 68 75 02,A.M.,42,9,Cerro l Espino,53,14,Club Deportivo Castellón,70,24,1.00,A.M. | Cerro l Espino | Club Deportivo Castellón | Francisco Palau Monfort
+70,952765,58912,5f 68 73 08,R.A.F.,42,6,Bosui.,50,12,"Real Racing Club, S.A.D.",65,24,1.00,"R.A.F. | Bosui. | Real Racing Club, S.A.D. | Manuel Huerta"
+71,1011677,89416,5f 68 73 04,R.M.C.,42,11,E.R.M.,55,17,Real Madrid Club de Fútbol,75,26,1.00,R.M.C. | E.R.M. | Real Madrid Club de Fútbol | Lorenzo Sanz Mancebo
+72,1101093,3455,5f 69 70 01,AS Roma,42,7,Olimpico di Roma,51,17,Real Betis Balompié B,71,21,1.00,AS Roma | Olimpico di Roma | Real Betis Balompié B | Manuel Ruiz de Lopera
+73,1104548,1231,5e 68 76 01,C.R.,42,8,C.D.,52,5,,,,0.90,C.R. | C.D. | Autonomiczna Sekcja Pilki Noznej Legia | Miroslaw Jablanski
+74,1105779,1236,5e 6f 76 03,Algeciras CF,42,12,Nuevo Mirar,56,11,FC Chernomorets Odessa,70,22,1.00,Algeciras CF | Nuevo Mirar | FC Chernomorets Odessa | Leonid Burjak
+75,1107015,1232,5f 6f 76 02,Rio Ave FC,42,10,Est. R,54,6,FC Dinamo Moscú,63,15,1.00,Rio Ave FC | Est. R | FC Dinamo Moscú | Adamas Golodets
+76,1108247,48882,5f 68 71 03,R.C.F.,42,7,Barreiro,51,8,Club Atlético Osasuna,62,21,1.00,R.C.F. | Barreiro | Club Atlético Osasuna | Juan Luis Irigaray
+77,1157129,1189,5e 6a 76 01,O.L.,42,10,G.S.,54,10,,,,0.90,O.L. | G.S. | Glasgow Rangers F. C. | Walter Smith
+78,1158318,1177,5f 6d 73 04,Kryl,42,4,S.S.A.,48,14,Racing Club de Lens,65,19,1.00,Kryl | S.S.A. | Racing Club de Lens | Slavo Muslin
+79,1159495,1173,5e 6b 76 05,1.FSV Mainz 05,64,15,Sollied,277,7,,,,0.90,1.FSV Mainz 05 | Sollied | Zentner | R.Z.
+80,1160668,3091,5f 69 72 05,Antequera CF,42,12,Nuevo El Mauli,56,14,Real Valladolid B,73,17,1.00,Antequera CF | Nuevo El Mauli | Real Valladolid B | Marcos Fernández Fernández
+81,1163759,1972,5f 69 70 09,Kocaelispor,49,12,T.A.M.K.S.,64,10,,,,0.90,Kocaelispor | T.A.M.K.S. | a'a | Alfonso Cordero
+82,1165731,2956,5f 68 7a 01,AD Alcorcon,42,11,Santo Domin.,55,12,Club de Fútbol Fuenlabrada,70,26,1.00,AD Alcorcon | Santo Domin. | Club de Fútbol Fuenlabrada | aaaAaFr
+83,1168687,3342,5f 68 7a 06,G.C.,42,8,Luigi Ferraris,52,15,Club Polideportivo Cacereño,70,27,1.00,G.C. | Luigi Ferraris | Club Polideportivo Cacereño | Angel Carrasco Jiménez
+84,1172029,1126,5d 61 73 01,C.N.,42,8,Est. Maira,52,10,cf,695,2,1.00,C.N. | Est. Maira | Nacional | an
+85,1173155,1533,5f 6a 73 07,B.F.,42,4,B.F.T.,48,16,,,,0.90,B.F. | B.F.T. | Associazione Sportiva Roma | Bianchi
+86,1174688,1424,5d 60 73 05,A.G.,42,6,Akhmat-Ar.,61,32,,,,0.90,A.G. | Akhmat-Ar. | aj | Vadim Ulyanov
+87,1176112,3236,5f 69 72 02,LOSC Lille,42,10,D.A.P.,54,10,Club Deportivo Logroñés B,67,25,1.00,LOSC Lille | D.A.P. | Club Deportivo Logroñés B | Emilio Ganuza Bacaicoa
+88,1179348,1226,5f 6f 76 01,C.P.A.,42,10,Est.,54,5,,,,0.90,C.P.A. | Est. | Spartak Moscú | Georgi Jartsev
+89,1180574,81416,5f 68 73 07,B.M.,42,8,S.i.B.,52,8,"Valencia Club de Fútbol, S.A.D.",63,31,1.00,"B.M. | S.i.B. | Valencia Club de Fútbol, S.A.D. | Francisco Roig Alfonso"
+90,1261990,3528,5f 69 71 09,C.F.,42,6,Celtic Pk.,50,11,Málaga Club de Fútbol,64,21,1.00,C.F. | Celtic Pk. | Málaga Club de Fútbol | Federico Beltrán Galindo
+91,1265518,1341,5c 68 73 01,UD Ibiza,42,10,Palladium Can Misses,54,23,cf,796,2,1.00,UD Ibiza | Palladium Can Misses | Universidad Católica de Chile | ap
+92,1266859,65034,5f 68 72 02,Zamora CF,42,10,Ruta la Plata,54,16,Club Atlético de Madrid S.A.D.,73,30,1.00,Zamora CF | Ruta la Plata | Club Atlético de Madrid S.A.D. | Jesús Gil y Gil
+93,1331893,1481,5f 6a 73 04,P.Z.,42,5,MAC3PARK stadion,49,16,,,,0.90,P.Z. | MAC3PARK stadion | Società Sportiva Lazio | Zeman
+94,1333374,3450,5f 68 76 06,F.L.,42,4,S.d.M.,48,11,Club Deportivo Lugo,62,19,1.00,F.L. | S.d.M. | Club Deportivo Lugo | Eliseo Corral
+95,1336824,36721,5f 68 76 05,C.T.,42,7,H.R.L.,51,10,"Levante Unión Deportiva, S.A.D.",64,31,1.00,"C.T. | H.R.L. | Levante Unión Deportiva, S.A.D. | araRamón Victor"
+96,1373545,39673,5f 68 71 06,Fenerbahce,42,13,C.S.F.S.S.S.,57,16,decerá al Real Madr,706,19,1.00,Fenerbahce | C.S.F.S.S.S. | l Ma | Lorenzo Sanz Mancebo
+97,1414439,1902,56 61 73 00,I.M.,42,9,Giuseppe Meazza,53,17,,,,0.90,I.M. | Giuseppe Meazza | Estrellas Mundiales España | Ignacio Valero Corrochano
+98,1416341,52120,5f 68 72 05,P.S.,42,5,Std. Mie,49,8,"Real Club Celta de Vigo, S.A.D.",60,31,1.00,"P.S. | Std. Mie | Real Club Celta de Vigo, S.A.D. | Horacio Gómez Araújo"
+99,1468461,1235,5d 6d 76 03,Villarreal B,42,13,Ceramica,57,9,,,,0.90,Villarreal B | Ceramica | F. C. Constructorul Chisinau | Matiura
+100,1469696,1220,5e 69 76 05,Red B,42,5,Red Bu,49,6,FC Tirol Innsbruck,58,18,1.00,Red B | Red Bu | FC Tirol Innsbruck | Dietmar Constantini
+101,1470916,3036,5f 69 73 03,Zulte Wareg.,42,12,E.A.,56,9,Club Deportivo Endesa As Pontes,68,31,1.00,Zulte Wareg. | E.A. | Club Deportivo Endesa As Pontes | axa
+102,1473952,54616,5f 68 71 00,CD Tondela,42,10,Est. Joao Carso,54,23,"Sociedad Deportiva Compostela, S.A.D.",80,37,1.00,"CD Tondela | Est. Joao Carso | Sociedad Deportiva Compostela, S.A.D. | José María Caneda Antelo"
+103,1528568,34251,5f 68 76 01,F.F.,42,5,Est. Mpal. Famal.,49,19,"Ecija Balompié, S.A.D.",71,22,1.00,"F.F. | Est. Mpal. Famal. | Ecija Balompié, S.A.D. | avaJosé"
+104,1562819,2064,5f 69 70 06,A.M.,42,8,Stade Louis-II,52,14,,,,0.90,A.M. | Stade Louis-II | Agrupación Deportiva Torrejón | Domingo Piqueras
+105,1564883,3031,5f 68 74 07,F.K.,42,6,A.O.,50,9,Bermeo Club,62,11,1.00,F.K. | A.O. | Bermeo Club | Aitor Ibinaga Asteínza
+106,1567914,1250,5f 61 76 04,N.N.,42,6,Goffertstadion,50,14,,,,0.90,N.N. | Goffertstadion | Malmö Fotbollförening | aa
+107,1569164,3337,5f 68 76 03,K.M.,42,6,A.K.,50,12,Real Avilés Industrial,65,22,1.00,K.M. | A.K. | Real Avilés Industrial | aaavaMa
+108,1572501,1625,5f 6b 73 07,Torino FC,42,9,O.G.T.,53,13,Newcastle United Football Club,69,30,1.00,Torino FC | O.G.T. | Newcastle United Football Club | Keegan
+109,1574126,48173,5f 68 71 01,Antalyaspor,48,14,C.A.P.A.S.,110,21,"Rayo Vallecano de Madrid, S.A.D.",65,32,1.00,"Antalyaspor | Rayo Vallecano de Madrid, S.A.D. | C.A.P.A.S. | ESTEPONA"
+110,1622299,2828,5f 68 74 04,AC Milan,42,8,Giuseppe Meazza,52,20,Aranjuez Club de Fútbol,75,23,1.00,AC Milan | Giuseppe Meazza | Aranjuez Club de Fútbol | Justo Castellano
+111,1625127,1689,5f 6b 73 09,A.F.,42,7,Emirates Std.,51,15,ARSENAL FOOTBALL CLUB,69,21,1.00,A.F. | Emirates Std. | ARSENAL FOOTBALL CLUB | Wenger
+112,1626816,1986,5f 69 70 08,E.F.,42,8,D.B.P.,52,13,,,,0.90,E.F. | D.B.P. | Arandina C.F. | Francisco Serrano
+113,1628802,1498,5f 6a 72 03,U.S.,42,5,S.J.M.,49,15,Internazionale Milano Football Club,67,35,1.00,U.S. | S.J.M. | Internazionale Milano Football Club | Hodgson
+114,1630300,1251,5e 6e 73 02,Goztepe,42,7,G.A.S.,51,8,,,,0.90,Goztepe | G.A.S. | NK SCT Olimpia Ljubljana | Perica Jedinko
+115,1631551,1211,5f 6c 73 09,C.B.,42,8,Jan Breylstadion,52,16,,,,0.90,C.B. | Jan Breylstadion | Hamburgo Sport Verein | Magath
+116,1632762,1165,5f 6c 73 08,U.C.,42,10,Bluen. Std.,54,11,,,,0.90,U.C. | Bluen. Std. | F.C. Schalke 04 | Neu
+117,1633927,1616,56 68 73 03,B.K.,42,5,Jan Breyl.,49,15,Club Atlético Vélez Sarsfield,67,29,1.00,B.K. | Jan Breyl. | Club Atlético Vélez Sarsfield | ai
+118,1635543,1220,5e 68 76 05,R.A.,42,9,L.P.,53,4,,,,0.90,R.A. | L.P. | Klub Sportowy Ruch Chorzow | Wyrobek
+119,1636763,1209,5e 69 73 01,H.V.,42,11,M.B.,55,8,Grasshopper Club Zurich,66,23,1.00,H.V. | M.B. | Grasshopper Club Zurich | Christian Gross
+120,1637972,1157,5d 68 76 04,Burnley FC,42,10,Turf Moor,54,11,,,,0.90,Burnley FC | Turf Moor | Barry Town F.C. | Barnett
+121,1639129,2988,5f 69 71 04,A.S.,42,8,Sta Raymo.,52,13,Unión Deportiva Realejos,68,24,1.00,A.S. | Sta Raymo. | Unión Deportiva Realejos | Alejandro González
+122,1642117,3171,5f 69 72 08,FC Volen.,42,9,K.S.,53,5,,,,0.90,FC Volen. | K.S. | Agrupación Deportiva Mar Menor | José Francisco Villaescusa
+123,1645288,1298,5e 6b 73 01,C.O.P.,42,13,Insta. Tajon.,57,18,,,,0.90,C.O.P. | Insta. Tajon. | Panathinaikos Athliticos Omilos | Juan Ramón Rocha
+124,1646586,1243,5e 6b 73 02,Rangers FC,42,10,Ibrox Std.,54,12,,,,0.90,Rangers FC | Ibrox Std. | AEK Atenas | Ravoussis
+125,1647829,1948,56 68 73 02,R.V.,42,11,Allianz-Std.,55,15,Club Atlético San Lorenzo de Almagro,73,36,1.00,R.V. | Allianz-Std. | Club Atlético San Lorenzo de Almagro | ad
+126,1649777,1358,5c 68 73 02,S.M.,42,9,Lukoil Ar.,53,25,Club Deportivo Colo Colo,81,24,1.00,S.M. | Lukoil Ar. | Club Deportivo Colo Colo | an
+127,1651135,53750,5f 68 73 09,1.FC Koln,50,15,RheinEnergieSTADION,103,22,"Real Oviedo, S.A.D.",68,19,1.00,"1.FC Koln | Real Oviedo, S.A.D. | RheinEnergieSTADION | CAJA DE ASTURIAS"
+128,1704885,1176,5e 6c 73 07,B.&.H.A.,42,12,A.S.,56,8,,,,0.90,B.&.H.A. | A.S. | F.C. National Bucurest | Florin Haljian
+129,1707282,1255,5f 6e 73 04,C.S.C.,42,12,Jaime Pacheco,305,13,Vitoria Sport Clube,56,19,1.00,C.S.C. | Vitoria Sport Clube | Vitoria Sport Clube Guimaraes | Jaime Pacheco
+130,1708537,1204,5f 60 76 02,A.A.,42,6,J.C.A.,50,14,Club Brujas KV,67,14,1.00,A.A. | J.C.A. | Club Brujas KV | Hugo Broos
+131,1709741,1325,5d 61 73 00,H.A.,42,7,Asito Std.,51,10,cf,707,2,1.00,H.A. | Asito Std. | Peñarol de Montevideo | al
+132,1711066,1180,5e 6c 76 02,Manch. City,42,12,E.S.,56,9,,,,0.90,Manch. City | E.S. | AC Sparta Praga | Vlastimil Petrzela
+133,1712246,1217,5f 6d 73 09,Mirandes,42,11,Anduva,55,9,Montpellier-Hérault Sporting Club,67,33,1.00,Mirandes | Anduva | Montpellier-Hérault Sporting Club | Mezy
+134,1713463,1214,5e 6a 73 04,Silke. IF,42,9,JYSK Pk.,53,9,,,,0.90,Silke. IF | JYSK Pk. | Silkeborg Idraets Forening | Elkjaer Larsen
+135,1714677,1163,5e 69 73 02,Z.L.,42,4,K.Z.A.,48,10,cf,492,2,1.00,Z.L. | K.Z.A. | F.C. Sion | Decastel
+136,1715840,1234,5e 6b 76 06,Kasimpasa,49,13,R.T.E.S.,65,19,,,,0.90,Kasimpasa | R.T.E.S. | Kjell Tennfjord | A.G.
+137,1717074,1422,5d 60 73 07,C.M.,42,6,VEB Ar.,50,8,SANTOS FUTEBOL CLUBE,61,20,1.00,C.M. | VEB Ar. | SANTOS FUTEBOL CLUBE | al
+138,1718496,1291,5e 6b 73 03,C.C.,42,10,U.D.,54,11,,,,0.90,C.C. | U.D. | Olympiakos Sindesmos Philathlon Peiraieus | Dusan Bajevic
+139,1719787,1187,5e 69 73 05,R.K.,42,5,Ak Bars Ar.,49,11,,,,0.90,R.K. | Ak Bars Ar. | F.C. Aarau | Martin Trümpler
+140,1720974,1184,5f 6d 72 02,A.A.,42,8,AFAS Std.,52,9,,,,0.90,A.A. | AFAS Std. | En Avant Guingamp | Francis Smerecki
+141,1722158,3111,5f 68 75 03,K.G.,42,7,C.A.,51,9,,,,0.90,K.G. | C.A. | A.D.C.Manlleu | Joan Prats i Sellés
+142,1725269,2700,5f 69 70 02,Z.S.P.,42,6,G.A.,50,9,Guadix Club de Fútbol,62,21,1.00,Z.S.P. | G.A. | Guadix Club de Fútbol | Antonio Ochoa Pérez
+143,1727969,4610,5f 68 75 07,S.B.,42,7,E.M.B.,51,14,Córdoba Club de Fútbol,68,22,1.00,S.B. | E.M.B. | Córdoba Club de Fútbol | Francisco Rojas
+144,1732579,1259,5f 60 73 01,G.A.,42,4,Eryam. Stady.,48,15,Ajax Amsterdam Football Club,66,28,1.00,G.A. | Eryam. Stady. | Ajax Amsterdam Football Club | Louis Van Gaal
+145,1733838,1192,5d 60 73 02,FC Nantes,42,9,Sta la Beaujoire,53,16,cf,705,2,1.00,FC Nantes | Sta la Beaujoire | Sociedade Esportiva Palmeiras | ÆanaaaMaáa
+146,1735030,4757,5f 68 77 04,FC Augsb.,42,10,W.A.,54,7,Pontevedra Club de Fútbol,64,25,1.00,FC Augsb. | W.A. | Pontevedra Club de Fútbol | Ramón Crespo Figueroa
+147,1739787,3335,5f 68 77 01,F.R.,42,6,R.A.,50,8,Racing Club Ferrol,61,18,1.00,F.R. | R.A. | Racing Club Ferrol | aaaxaIs
+148,1743122,3944,5f 69 73 05,S.R.F.,42,11,R.P.,55,7,Club Deportivo Carabanchel,65,26,1.00,S.R.F. | R.P. | Club Deportivo Carabanchel | Ernesto Sánchez Juárez
+149,1747066,37611,5f 68 70 06,F.D.E.,42,10,Denr Football Complex,54,24,"Villarreal Club de Fútbol, S.A.D.",81,33,1.00,"F.D.E. | Denr Football Complex | Villarreal Club de Fútbol, S.A.D. | Pascual Font de Mora Chabrera"
+150,1784677,1180,5e 6a 76 02,US Sassu.,42,10,Mapei Std.,54,11,Celtic FC,68,9,1.00,US Sassu. | Mapei Std. | Celtic FC | Thomas Burns
+151,1785857,1178,5f 6c 73 04,Aston Villa,42,12,Villa Pk.,56,12,,,,0.90,Aston Villa | Villa Pk. | 1 F. C. Kaiserslautern | Rehhagel
+152,1787035,105396,5f 68 73 01,1.FC Heidenheim 1846,64,21,Voith-Ar.,101,26,,,,0.90,1.FC Heidenheim 1846 | Voith-Ar. | aia | KAPPA
+153,1892431,1226,5c 69 73 00,SD Taraz.,42,10,Mpal. Tarazona,54,16,,,,0.90,SD Taraz. | Mpal. Tarazona | Corporación Deportiva América | ac
+154,1893657,3376,5f 69 70 05,T.1.H.,42,10,P.A.,54,7,Valencia Club de Fútbol B,64,25,1.00,T.1.H. | P.A. | Valencia Club de Fútbol B | Francisco Roig
+155,1897033,1445,5d 60 73 08,Ourense CF,42,10,O Couto,54,11,Fluminense Futebol Clube,68,24,1.00,Ourense CF | O Couto | Fluminense Futebol Clube | am
+156,1898478,4632,5f 69 73 02,H.F.,42,7,Easter Road Std.,51,21,Real Club Celta B,75,17,1.00,H.F. | Easter Road Std. | Real Club Celta B | Fidel Alvarez
+157,1903110,6990,5f 68 70 07,F.S.P.,42,6,Millerntor-Std.,50,17,"Getafe Club de Fútbol, S.A.D.",70,29,1.00,"F.S.P. | Millerntor-Std. | Getafe Club de Fútbol, S.A.D. | ataFr"
+158,1910100,1228,5f 60 76 01,Chelsea FC,42,10,Stamford Bridge,54,21,Royal Sporting Club Anderlecht,78,30,1.00,Chelsea FC | Stamford Bridge | Royal Sporting Club Anderlecht | Johan Boskamp
+159,1911328,1539,5f 6a 73 02,J.F.,42,8,A.S.,52,10,Juventus Football Club,65,22,1.00,J.F. | A.S. | Juventus Football Club | Lippi
+160,1912867,1481,5f 6a 73 05,M.K.B.S.,49,13,Parma Associazione Calcio,65,25,,,,0.90,M.K.B.S. | Parma Associazione Calcio | Ancelotti | Nista
+161,1915569,5713,5f 69 73 01,W.L.,42,6,S.W.,50,7,Club Marino de Luanco,60,21,1.00,W.L. | S.W. | Club Marino de Luanco | Luis Gallego
+162,1921282,2771,5f 69 73 06,Morei. FC,42,10,Est.,54,5,Real Sporting de Gijón B,62,24,1.00,Morei. FC | Est. | Real Sporting de Gijón B | José Fernández Alvarez
+163,1924053,3476,5f 68 74 00,RC Lens,42,7,Sta Bolla.,51,15,Yeclano Club de Fútbol,69,22,1.00,RC Lens | Sta Bolla. | Yeclano Club de Fútbol | Enrique Ortega
+164,1927529,1164,5e 6c 73 06,US Cremo.,42,11,G.Z.,55,8,UFC Rapid Bucarest,66,18,1.00,US Cremo. | G.Z. | UFC Rapid Bucarest | Dumitru
+165,1928693,1211,5e 6a 73 06,F.T.E.,42,6,Grolsch Veste,50,14,,,,0.90,F.T.E. | Grolsch Veste | Odense Boldklub | Viggo Jensen
+166,1929904,1174,5e 6a 76 05,A.F.,42,8,P.S.,52,9,,,,0.90,A.F. | P.S. | Aberdeen F.C. | Roy Aitken
+167,1931078,3388,5f 69 72 04,S.R.,42,7,S.-.H.K.,51,11,Sociedad Deportiva Gernika Club,65,31,1.00,S.R. | S.-.H.K. | Sociedad Deportiva Gernika Club | Angel Artola Garaizábal
+168,1934466,1414,5d 60 73 06,P.S.,42,11,P.s.P.,55,8,Sport Club Corinthians,66,22,1.00,P.S. | P.s.P. | Sport Club Corinthians | an
+169,1935880,1308,5d 6d 73 03,Newca. United,42,13,S.J.P.,57,6,,,,0.90,Newca. United | S.J.P. | F. C. Dinamo Batumi | S. Tchelshvili
+170,1937188,1240,5f 6f 76 04,S.B.2.,42,14,S.F.B.,58,7,,,,0.90,S.B.2. | S.F.B. | Alania Vladikavkaz | Valeri Gazzayev
+171,1938428,1158,5e 6c 76 03,B.M.,42,12,A.A.,56,4,,,,0.90,B.M. | A.A. | SK Slavia Praga | Frantisek Cipro
+172,1939586,1590,56 68 72 02,LASK,42,6,Raiffeisen Ar.,50,16,Racing Club de Avellaneda,69,25,1.00,LASK | Raiffeisen Ar. | Racing Club de Avellaneda | ag
+173,1941176,3520,5f 68 77 02,Como 1907,42,9,Giuse. Sinig.,53,18,Club Deportivo Mensajero,74,24,1.00,Como 1907 | Giuse. Sinig. | Club Deportivo Mensajero | Guillermo Jiménez García
+174,1944696,1182,5d 69 73 01,L.H.A.,42,10,S.O.,54,9,,,,0.90,L.H.A. | S.O. | Maccabi Tel Aviv | Avraham Grant
+175,1945878,1308,5d 60 73 01,FC Cartagena,42,13,Cartagonova,57,12,cf,745,2,1.00,FC Cartagena | Cartagonova | Vasco de Gama | al
+176,1947186,1187,5e 6f 73 01,R.S.A.,42,11,S.M.,55,8,Ferencvarosi Torna Club,66,23,1.00,R.S.A. | S.M. | Ferencvarosi Torna Club | Deszo Novak
+177,1948373,1215,5f 6f 76 06,PSV Eindh.,42,10,P.S.,54,4,,,,0.90,PSV Eindh. | P.S. | CSKA Moscú | Aleksandr Tarkhanov
+178,1949588,1203,5f 6d 73 03,F.A.,42,7,C.D. Alverca,51,14,,,,0.90,F.A. | C.D. Alverca | Association de la Jeunesse Auxerre | Guy Roux
+179,1950791,1132,5d 60 73 00,N.B.,42,8,R.V.S.,52,8,Club de Regatas Flamengo,63,24,1.00,N.B. | R.V.S. | Club de Regatas Flamengo | ag
+180,1951923,3173,5f 68 77 06,S.W.B.,42,8,Weserstadion,52,12,,,,0.90,S.W.B. | Weserstadion | C.D.Colonia Moscardó | Antonio López
+181,1955096,3563,5f 68 75 05,F.F.,42,7,C.C.,51,7,Fútbol Club Andorra,61,19,1.00,F.F. | C.C. | Fútbol Club Andorra | ama
+182,1958659,2974,5f 68 76 02,S.F.,42,8,E.S.,52,13,Club Deportivo Numancia,68,23,1.00,S.F. | E.S. | Club Deportivo Numancia | Francisco Rubio Garcés
+183,1961633,1245,5c 6a 73 00,Borus. Dortm.,42,14,S.I.P.,58,15,,,,0.90,Borus. Dortm. | S.I.P. | Olimpia de Asunción | am
+184,1962878,67165,5f 68 73 06,Bologna FC 1909,71,19,Std.,144,5,,,,0.90,Bologna FC 1909 | Std. | No tiene | UMBRO
+185,2030043,1223,5f 6e 73 01,Eyups.,42,6,R.T.E.S.,50,9,Futebol Clube do Porto,62,22,1.00,Eyups. | R.T.E.S. | Futebol Clube do Porto | Oliveira
+186,2031266,1253,5f 6e 73 06,F.S.,42,8,F.S.S.,52,8,,,,0.90,F.S. | F.S.S. | Boavista F. C. | Zoran Filipovic
+187,2032519,1183,5e 68 73 03,Galatasaray,42,11,A.S.Y.S.R.P.,55,12,,,,0.90,Galatasaray | A.S.Y.S.R.P. | Galatasaray Spor Kulübü | Fatih Terim
+188,2033702,1592,5f 6a 73 01,K.G.,42,5,P.G.a.,49,15,,,,0.90,K.G. | P.G.a. | Associazione Calcio Milan | Tabárez
+189,2035294,3137,5f 69 71 07,Kayserispor,49,13,R.E.E.S.,105,21,Club Polideportivo Ejido,65,24,1.00,Kayserispor | Club Polideportivo Ejido | R.E.E.S. | Patrocinador
+190,2038431,3058,5f 68 76 09,O.L.,42,6,King Power,50,11,Athletic B (96),594,15,1.00,O.L. | King Power | Sociedad Deportiva Lemona | José Luis Ordeñana
+191,2041489,1212,5f 61 76 05,Hambu. SV,42,10,Volks.,54,7,,,,0.90,Hambu. SV | Volks. | AIK Estocolmo | Hamren
+192,2042701,1157,5e 68 73 02,Trabzonspor,42,11,P.P.,55,9,,,,0.90,Trabzonspor | P.P. | Trabzonspor Kulübü | Senol Günes
+193,2045079,1227,5f 61 76 06,W.H.U.,42,12,L.S.,56,7,,,,0.90,W.H.U. | L.S. | Helsingborgs Idrottsförening | aa
+194,2046306,1234,5c 69 73 01,Gil Vicente FC,42,14,Est. Ci Barcelos,58,17,,,,0.90,Gil Vicente FC | Est. Ci Barcelos | Atlético Nacional de Medellín | aq
+195,2047540,1166,5e 6c 73 01,G.A.E.,42,9,Alaar.,53,6,,,,0.90,G.A.E. | Alaar. | Steaua Bucarest | Dumitru Dumitriu
+196,2048706,1244,5e 6f 76 02,AFC Bourn.,42,11,V.S.,55,10,,,,0.90,AFC Bourn. | V.S. | Dinamo Kiev | Jozsef Szabo
+197,2049950,1283,5e 6e 76 04,B.0.L.,42,11,A. Mousbalis,286,12,AEK Football Club Larnaca,63,25,1.00,B.0.L. | AEK Football Club Larnaca | A. Mousbalis | Flekken
+198,2051233,49364,5f 68 72 01,SL Benfica,42,13,E.L.,57,6,"Real Sociedad de Fútbol, S.A.D.",66,31,1.00,"SL Benfica | E.L. | Real Sociedad de Fútbol, S.A.D. | Luis Uranga Otaegui"
+199,2100597,1308,5d 6d 73 02,SSC Napoli,42,14,D.A.M.,58,15,,,,0.90,SSC Napoli | D.A.M. | Dinamo Tbilisi Diagomi Masiv | David Kipiani
+200,2101905,2823,5f 68 7b 09,C.P.,42,11,Selhu. Pk.,55,11,,,,0.90,C.P. | Selhu. Pk. | Unió Esportiva Sant Andreu | Joan Coma
+201,2104728,6219,5f 68 75 04,Alanyaspor,49,15,A.O.S.,103,12,Elche Club de Fútbol,67,20,1.00,Alanyaspor | Elche Club de Fútbol | A.O.S. | Patrocinador
+202,2110947,51399,5f 68 71 07,N.F.,42,8,The City Ground,52,15,"Hércules Club de Fútbol, S.A.D.",70,31,1.00,"N.F. | The City Ground | Hércules Club de Fútbol, S.A.D. | Aniceto Benito Núñez"
+203,2162346,2812,5f 69 73 07,L.F.,42,6,Anfield,50,7,,,,0.90,L.F. | Anfield | Sociedad Deportiva Huesca | Javier Tebas Medrano
+204,2165158,1196,5f 60 73 04,Leg,42,3,S.M.i.M.J.P.,47,16,,,,0.90,Leg | S.M.i.M.J.P. | Philips Sport Vereniging Eindhoven | Dick Advocaat
+205,2166354,3387,5f 69 72 00,ACF Fiore.,42,13,A.F.,57,6,Real Sociedad de Fútbol B,66,25,1.00,ACF Fiore. | A.F. | Real Sociedad de Fútbol B | Luis Uranga
+206,2169741,3621,5f 68 7a 08,SK Sturm Graz,42,13,Merkur Ar.,57,16,Real Madrid Club de Fútbol C,76,28,1.00,SK Sturm Graz | Merkur Ar. | Real Madrid Club de Fútbol C | Lorenzo Sanz Mancebo
+207,2173362,3377,5f 68 77 05,R.L.,42,7,Easi Ar.,51,8,,,,0.90,R.L. | Easi Ar. | Unión Popular de Langreo | aaasaAl
+208,2176739,3149,5f 69 73 08,C.E.A.,42,9,E.J.G.,53,7,Club Atlético Osasuna B,63,23,1.00,C.E.A. | E.J.G. | Club Atlético Osasuna B | Juan Luis Iragaray
+209,2179888,3225,5f 68 70 02,L.U.,42,8,E.R.,52,9,Club Atlético Marbella,64,22,1.00,L.U. | E.R. | Club Atlético Marbella | José Luis Fernández Garrosa
+210,2183113,2641,5f 69 71 01,R.C.S.,42,6,S.d.P.C.,50,12,Real Murcia Club de Fútbol,65,26,1.00,R.C.S. | S.d.P.C. | Real Murcia Club de Fútbol | Faustino Cano
+211,2185754,2675,5f 69 71 00,1.U.B.,42,6,S.A.r.A.F.,50,17,Club de Fútbol Llíria,70,21,1.00,1.U.B. | S.A.r.A.F. | Club de Fútbol Llíria | Carlos Carbonell Guna
+212,2188429,1230,5e 69 76 06,AJ Auxerre,42,11,Sta l'Abbe-Deschamps,55,23,,,,0.90,AJ Auxerre | Sta l'Abbe-Deschamps | Casino Graz-Grazer | Ljubo Petrovic
+213,2189659,3343,5f 68 74 09,F.U.,42,8,Kelme,148,5,,,,0.90,F.U. | Patrocinador | Kelme | ck
+214,2193002,52979,5f 68 73 05,S.A.,42,8,S.o.L.,52,9,Athletic Club,64,13,1.00,S.A. | S.o.L. | Athletic Club | José María Arrate Llosa
+215,2245981,1237,5f 60 76 06,V.W.,42,9,Volks. Ar.,53,13,KFC Germinal Ekeren,69,19,1.00,V.W. | Volks. Ar. | KFC Germinal Ekeren | Gzil
+216,2247218,1305,5e 61 76 01,M.U.,42,12,O.T.,56,9,,,,0.90,M.U. | O.T. | Knattspyrnufélag Reykjavíkur | Lukas Kostic
+217,2248523,2908,5f 68 7b 03,SS Lazio,42,8,Olimpico di Roma,52,17,Benidorm Club Deportivo,72,23,1.00,SS Lazio | Olimpico di Roma | Benidorm Club Deportivo | José Requena Plá
+218,2251431,3904,5f 68 7a 05,A.B.,42,8,N.B.A.-.B.,52,20,Club Deportivo Manchego,75,23,1.00,A.B. | N.B.A.-.B. | Club Deportivo Manchego | Mariano Pérez-Sauquillo
+219,2255335,47724,5f 68 72 07,Gazia. FK,42,10,Gaziantep Stadyumu,54,19,"Real Valladolid, S.A.D.",76,23,1.00,"Gazia. FK | Gaziantep Stadyumu | Real Valladolid, S.A.D. | Marcos Fernández Fernández"
+220,2303059,1186,5e 6a 73 05,O.N.,42,6,Allia. Rivie.,50,14,,,,0.90,O.N. | Allia. Rivie. | AGF Aarhus | Rudbaeck
+221,2304245,45794,5f 68 77 03,VfB Stutt.,42,10,MHPAr. Stutt.,54,15,"Unión Deportiva Las Palmas, S.A.D.",72,34,1.00,"VfB Stutt. | MHPAr. Stutt. | Unión Deportiva Las Palmas, S.A.D. | Adrián Déniz Marrero"
+222,2350039,1198,5e 69 73 04,T.H.,42,9,Totte. Hotsp. Std.,53,21,,,,0.90,T.H. | Totte. Hotsp. Std. | Neuchatel Xamax F. C. | Gilbert Gress
+223,2351237,1210,5e 68 76 06,Cracovia,42,11,Std. C,55,6,,,,0.90,Cracovia | Std. C | Klub Sportowy Hutnik | Jerzy Kasalik
+224,2352447,1259,5f 6e 73 02,L.P.,42,10,Enea Poznan,54,13,Sporting Clube de Portugal,70,26,1.00,L.P. | Enea Poznan | Sporting Clube de Portugal | Robert Waseige
+225,2354927,2775,5f 69 71 06,J.B.,42,6,C.A.,50,7,,,,0.90,J.B. | C.A. | Unión Deportiva Gáldar | José Martín Bolaños
+226,2357702,2063,5f 69 77 00,E.R.,42,8,etxeapaEnriq,401,12,,,,0.90,"E.R. | ah | etxeapaEnriq | ND,ND,ND,ND,ND"
+227,2359765,2473,5f 68 7b 00,Paris FC,42,8,Sta Jean Bouin,52,14,,,,0.90,Paris FC | Sta Jean Bouin | C.E.Sabadell | Joan Puig
+228,2362238,1859,56 68 72 01,P.C.1.,42,13,Ennio Tardini,57,13,Club Atlético Independiente,73,27,1.00,P.C.1. | Ennio Tardini | Club Atlético Independiente | af
+229,2364097,1218,5d 68 73 03,Hear,42,4,T.P.,48,9,,,,0.90,Hear | T.P. | Myllykosken Pallo-47 | Harri Kampman
+230,2365315,39556,5f 68 77 08,F.P.,42,6,Est. Dragao,50,12,"Deportivo Alavés, S.A.D.",65,24,1.00,"F.P. | Est. Dragao | Deportivo Alavés, S.A.D. | apaJuan Arregi GarayGca"
+231,2404871,3311,5f 68 75 08,AS Monaco,42,9,Sta Louis.,53,11,Real Jaén Club de Fútbol,67,24,1.00,AS Monaco | Sta Louis. | Real Jaén Club de Fútbol | Juan Carlos Hidalgo Mora
+232,2408182,1187,5e 6a 73 03,R.M.C.,42,7,Alfre Di Stefa.,51,15,,,,0.90,R.M.C. | Alfre Di Stefa. | Brondby Idraets Forening | Ebbe Skovdahl
+233,2409369,1197,5f 6c 73 06,V.G.S.,42,9,E.D.A.H.,53,8,,,,0.90,V.G.S. | E.D.A.H. | F. C. Bayern Munich e.V. | Trapattoni
+234,2410566,3430,5f 68 76 08,S.V.,42,6,D.W.S.S.,50,11,Club Deportivo Izarra,64,21,1.00,S.V. | D.W.S.S. | Club Deportivo Izarra | José Antonio Jordana Arza
+235,2413996,1650,56 68 72 03,R.C.,42,4,zoncr. Ar.,48,12,Club Atlético Boca Juniors,63,26,1.00,R.C. | zoncr. Ar. | Club Atlético Boca Juniors | ÆanaaaM
+236,2415646,1222,5e 68 76 03,L.G.,42,6,Polsat,50,6,,,,0.90,L.G. | Polsat | Sekcja Pilki Noznej Widzew Lodz | Smuda
+237,2416868,1249,5f 6f 76 07,S.T.,42,8,B.S.,52,7,,,,0.90,S.T. | B.S. | Torpedo Moscú | Valentin Ivanov
+238,2418117,3088,5f 69 71 05,S.L.,42,5,M.D.S.,49,15,Vélez Club de Fútbol,67,20,1.00,S.L. | M.D.S. | Vélez Club de Fútbol | Aurelio Muñoz Gutiérrez
+239,2421205,1195,5f 6d 73 05,D.M.,42,6,VTB-Ar.,50,8,,,,0.90,D.M. | VTB-Ar. | Association Sportive de Monaco | Jean Tigana
+240,2422400,1266,5e 6f 76 04,Besiktas JK,42,13,B.P.,57,7,,,,0.90,Besiktas JK | B.P. | Niva Vinnitsa | P. Kassanov
+241,2423666,3546,5f 69 72 07,Lokom. Moscow,42,14,RZD Ar.,58,10,Real Sociedad Gimnástica de Torrelavega,71,39,1.00,Lokom. Moscow | RZD Ar. | Real Sociedad Gimnástica de Torrelavega | Joaquín Ruiz Ruiz
+242,2427212,47831,5f 68 70 01,K.W.,42,7,H.K.,51,9,"Club Deportivo Badajoz, S.A.D.",63,30,1.00,"K.W. | H.K. | Club Deportivo Badajoz, S.A.D. | awaFélix Casti"
+243,2475043,2999,5f 69 72 09,G.E.P.,42,6,E.A.C.M.,50,16,Gandía Club de Fútbol,69,21,1.00,G.E.P. | E.A.C.M. | Gandía Club de Fútbol | Ignacio Avilés Rubio
+244,2478042,3221,5f 69 73 04,US Lecce,42,8,Ettore Giard.,52,15,Real Oviedo B,70,13,1.00,US Lecce | Ettore Giard. | Real Oviedo B | Eugenio Prieto
+245,2481263,3288,5f 68 74 02,F.M.,42,5,Sta St.-S.,49,17,Cádiz Club de Fútbol,69,20,1.00,F.M. | Sta St.-S. | Cádiz Club de Fútbol | Manuel García Fernández
+246,2484551,1227,5f 6f 73 01,SC Heerenveen,42,13,A.L.S.,57,13,,,,0.90,SC Heerenveen | A.L.S. | F. K. Estrella Roja | Petrovic
+247,2485778,1355,5c 68 73 00,O.M.,42,11,O.V.,55,8,cf,707,2,1.00,O.M. | O.V. | Universidad de Chile | ad
+248,2487133,1167,5e 6f 73 04,Pisa SC,42,7,Peter Torok,293,11,Kispest Honved Football Club,67,28,1.00,Pisa SC | Kispest Honved Football Club | Peter Torok | A.S.
+249,2488300,3414,5f 68 7b 01,FC Toulo.,42,10,S.M.,54,9,Club Deportivo Hospitalet,66,25,1.00,FC Toulo. | S.M. | Club Deportivo Hospitalet | Miguel García
+250,2491714,80049,5f 68 73 02,FC Groni.,42,9,Eurob.,53,6,Real Club Deportivo de la Coruña S.A.D.,62,39,1.00,FC Groni. | Eurob. | Real Club Deportivo de la Coruña S.A.D. | Augusto César Lendoiro
+251,2571763,44865,5f 68 72 06,Samsu.,42,8,S.Y.,52,10,"Club Deportivo Logroñés, S.A.D.",65,31,1.00,"Samsu. | S.Y. | Club Deportivo Logroñés, S.A.D. | Emilio Ganuza Bacaicoa"
+252,2616628,3643,5f 69 73 09,G.Z.,42,11,Ar. Zabrze,55,16,,,,0.90,G.Z. | Ar. Zabrze | Cultural y Deportiva Leonesa | Salvio Barrioluengo Blanco
+253,2620271,1212,5e 6b 76 01,Sp. CP,42,9,E.J.A.,53,9,,,,0.90,Sp. CP | E.J.A. | Rosenborg Ballklub | Nils Arne Eggen
+254,2621483,3327,5f 68 76 07,Avs Futeb.,42,10,Gonzalo Arkonada,429,16,Real Unión de Irún,60,18,1.00,Avs Futeb. | Gal | Real Unión de Irún | Est. Clube Desportivo s Aves
+255,2624810,1179,5f 6c 73 07,RB Leipzig,42,10,R.B.A.,54,8,Karlsruher Sport Club,65,21,1.00,RB Leipzig | R.B.A. | Karlsruher Sport Club | Winfried Schafer
+256,2625989,1163,5e 6c 73 05,Leonesa,42,15,R.L.,59,9,,,,0.90,Leonesa | R.L. | F.C. Gloria Bistrita | R. Vlad
+257,2628373,1357,5d 60 73 03,Ceuta,42,8,Alfon. Murube,52,13,cf,739,2,1.00,Ceuta | Alfon. Murube | Botafogo de Futebol e Regatas | an
+258,2629730,6144,56 61 76 05,Evert. FC,42,9,Hill Dicki. Std.,53,18,Deportivo,576,9,1.00,Evert. FC | Hill Dicki. Std. | JUVENILES | Ignacio Valero Corrochano
+259,2635874,1237,5f 6e 73 03,F.K.,42,7,O.A.,51,6,,,,0.90,F.K. | O.A. | Sport Lisboa e Benfica | Paulo Autori
+260,2637111,54987,5f 68 72 04,F.A.,42,8,E.M.A.,52,10,"Real Sporting de Gijón, S.A.D.",65,30,1.00,"F.A. | E.M.A. | Real Sporting de Gijón, S.A.D. | José Fernández"

@@ -1,0 +1,31 @@
+# Android
+*.iml
+.gradle/
+.idea/
+local.properties
+.DS_Store
+android/build/
+android/*/build/
+android/*/*/build/
+android/*/*/*/build/
+*.hprof
+android/qa_screenshots/
+android/ui_dump*.xml
+android/ui_*.xml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Data — archivos binarios del juego original (no incluir)
+data/*.PKF
+data/*.DAT
+data/*.DBC
+tools/out/
+
+# OS
+Thumbs.db
+desktop.ini
