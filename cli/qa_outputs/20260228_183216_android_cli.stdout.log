@@ -1,0 +1,37 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 1092 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  Partida guardada — CODEX_QA  ★☆☆☆☆
+  2025-26  ·  SD Ponferradina  ·  J1
+
+  1. Continuar partida
+  2. Borrar manager activo
+  0. Volver
+  Opción:   Número inválido.
+  Opción: 

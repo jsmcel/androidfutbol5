@@ -1,0 +1,156 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 1092 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. Cádiz CF
+       Segunda División  ·  Fuerza: 48.3
+       Objetivo: EVITAR EL DESCENSO
+
+  2. Real Valladolid CF
+       Segunda División  ·  Fuerza: 47.9
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  3. FC Andorra
+       Segunda División  ·  Fuerza: 47.2
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  4. UD Las Palmas
+       Segunda División  ·  Fuerza: 47.7
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a Cádiz CF, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : Cádiz CF              Jornada  : 1/42
+  Objetivo: EVITAR EL DESCENSO
+
+    #  EQUIPO                    PJ  PTS
+    1  SD Huesca                  0    0
+    2  Real Valladolid CF         0    0
+    3  Granada CF                 0    0
+        ...
+   16  UD Las Palmas              0    0
+   17  CD Castellón               0    0
+   18  Cádiz CF                   0    0 ◄
+       ─── zona de descenso ──
+   19  Real Sociedad B            0    0
+   20  CD Mirandés                0    0
+   21  Cultural Leonesa           0    0
+   22  AD Ceuta FC                0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  SD Eibar  vs  Cádiz CF
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–42...
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: FC Andorra (70 pts)
+
+  TU RESULTADO — Cádiz CF
+  Posición: 10º / 22
+  PJ:42  G-E-P: 17-7-18  GF:64  GC:62  DG:+2  PTS:58
+
+  Objetivo: EVITAR EL DESCENSO
+  ✓  OBJETIVO CUMPLIDO
+
+  Prestigio: ★☆☆☆☆  →  ★★☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  FC Andorra                42  20  10  12  75  60  +15   70
+    2  UD Almería                42  19  13  10  64  52  +12   70
+    3  AD Ceuta FC               42  20  10  12  57  51   +6   70
+    4  SD Huesca                 42  20  10  12  56  50   +6   70
+    5  Albacete Balompié         42  19  12  11  60  44  +16   69
+    6  CD Leganés                42  18  14  10  65  52  +13   68
+    7  Sporting Gijón            42  18  10  14  64  50  +14   64
+    8  CD Mirandés               42  17  13  12  66  61   +5   64
+    9  Deportivo de La Coruña    42  16  14  12  68  60   +8   62
+   10  Cádiz CF                  42  17   7  18  64  62   +2   58
+   11  Real Zaragoza             42  16  10  16  59  59   +0   58
+   12  Real Valladolid CF        42  17   6  19  61  61   +0   57
+   13  CD Castellón              42  15   9  18  61  58   +3   54
+   14  Real Sociedad B           42  14  12  16  57  59   -2   54
+   15  Granada CF                42  15   9  18  65  75  -10   54
+   16  Málaga CF                 42  11  18  13  62  57   +5   51
+   17  Córdoba CF                42  12  12  18  48  66  -18   48
+   18  UD Las Palmas             42  12  11  19  56  65   -9   47
+   19  SD Eibar                  42  13   8  21  47  60  -13   47
+   20  Racing Santander          42  13   7  22  56  70  -14   46
+   21  Burgos CF                 42  12  10  20  37  58  -21   46
+   22  Cultural Leonesa          42   9  13  20  45  63  -18   40
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Victor Aznar (+3 ME), Bojan Kovacevic (+3 RE), Pelayo Fernández (+3 ME), Sergio Arribas (+2 ME)
+  BAJAN:    David Gil (-1 VE), Iza Carcelén (-1 VE), Yussi Diarra (-1 ME), Álex Fernández (-1 VE) - veterano 33 anos
+  RETIRAN:  Ningun jugador se retira
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ¡Hasta la próxima temporada!
+

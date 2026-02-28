@@ -1,0 +1,145 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 1092 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. CD Mirandés
+       Segunda División  ·  Fuerza: 47.8
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  2. Córdoba CF
+       Segunda División  ·  Fuerza: 48.0
+       Objetivo: EVITAR EL DESCENSO
+
+  3. UD Las Palmas
+       Segunda División  ·  Fuerza: 47.7
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  4. Real Valladolid CF
+       Segunda División  ·  Fuerza: 47.9
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a CD Mirandés, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO DIRECTO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : CD Mirandés           Jornada  : 1/42
+  Objetivo: EVITAR EL DESCENSO DIRECTO
+
+    #  EQUIPO                    PJ  PTS
+    1  SD Huesca                  0    0
+    2  Real Valladolid CF         0    0
+    3  Granada CF                 0    0
+        ...
+   18  Cádiz CF                   0    0
+       ─── zona de descenso ──
+   19  Real Sociedad B            0    0
+   20  CD Mirandés                0    0 ◄
+   21  Cultural Leonesa           0    0
+   22  AD Ceuta FC                0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  Burgos CF  vs  CD Mirandés
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–42...
+
+  ═══ VENTANA DE MERCADO DE INVIERNO ═══
+  ¿Quieres fichar algún jugador? (S/N):   Continúa la temporada sin movimientos.
+
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: Cádiz CF (72 pts)
+
+  TU RESULTADO — CD Mirandés
+  Posición: 15º / 22
+  PJ:42  G-E-P: 14-9-19  GF:61  GC:68  DG:-7  PTS:51
+
+  Objetivo: EVITAR EL DESCENSO DIRECTO
+  ✓  OBJETIVO CUMPLIDO
+
+  Prestigio: ★☆☆☆☆  →  ★★☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  Cádiz CF                  42  22   6  14  66  45  +21   72
+    2  Real Sociedad B           42  22   6  14  53  39  +14   72
+    3  Burgos CF                 42  20  10  12  61  55   +6   70
+    4  SD Huesca                 42  17  16   9  59  39  +20   67
+    5  CD Leganés                42  19   9  14  66  58   +8   66
+    6  FC Andorra                42  19   9  14  55  55   +0   66
+    7  UD Almería                42  17  12  13  68  40  +28   63
+    8  AD Ceuta FC               42  16  13  13  57  51   +6   61
+    9  Deportivo de La Coruña    42  17  10  15  58  53   +5   61
+   10  Cultural Leonesa          42  15  16  11  55  53   +2   61
+   11  Racing Santander          42  16  12  14  58  57   +1   60
+   12  Real Zaragoza             42  16  11  15  59  57   +2   59
+   13  Córdoba CF                42  16  11  15  58  57   +1   59
+   14  UD Las Palmas             42  16  11  15  52  64  -12   59
+   15  CD Mirandés               42  14   9  19  61  68   -7   51
+   16  Málaga CF                 42  13   9  20  50  57   -7   48
+   17  Albacete Balompié         42  11  15  16  53  64  -11   48
+   18  SD Eibar                  42  13   8  21  49  69  -20   47
+   19  Sporting Gijón            42  12  10  20  48  54   -6   46
+   20  CD Castellón              42  11  12  19  45  57  -12   45
+   21  Real Valladolid CF        42  10  14  18  48  55   -7   44
+   22  Granada CF                42  12   7  23  55  87  -32   43
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Adrián Pica (+3 VE), Jorge Cabello (+2 ME), Juan Gutiérrez (+1 ME), Iker Córdoba (+2 ME)
+  BAJAN:    Igor Nikic (-1 ME), Juanpa Palomares (-1 ME), Nikola Maras (-1 ME), Juan Gutiérrez (-1 CA)
+  RETIRAN:  Sergio Postigo (37 anos)
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  1. Continuar carrera
+  2. Salir al menu principal
+  Opcion: 

@@ -1,0 +1,13 @@
+=== STDOUT ===
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+[ERROR] No se encuentra el CSV: C:\Users\Jose-Firebat\proyectos\android\core\data\src\main\assets\pcf55_players_2526.csv
+
+=== STDERR ===
+(vacio)
+=== EXIT CODE: 1 ===

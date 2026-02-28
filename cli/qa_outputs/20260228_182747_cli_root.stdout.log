@@ -1,0 +1,146 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 1092 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. Burgos CF
+       Segunda División  ·  Fuerza: 48.1
+       Objetivo: EVITAR EL DESCENSO
+
+  2. Real Valladolid CF
+       Segunda División  ·  Fuerza: 47.9
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  3. Real Zaragoza
+       Segunda División  ·  Fuerza: 48.3
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Córdoba CF
+       Segunda División  ·  Fuerza: 48.0
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a Burgos CF, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : Burgos CF             Jornada  : 1/42
+  Objetivo: EVITAR EL DESCENSO
+
+    #  EQUIPO                    PJ  PTS
+    1  SD Huesca                  0    0
+    2  Real Valladolid CF         0    0
+    3  Granada CF                 0    0
+    4  Albacete Balompié          0    0
+    5  Burgos CF                  0    0 ◄
+    6  Racing Santander           0    0
+    7  SD Eibar                   0    0
+        ...
+   20  CD Mirandés                0    0
+   21  Cultural Leonesa           0    0
+   22  AD Ceuta FC                0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  Burgos CF  vs  CD Mirandés
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–42...
+
+  ═══ VENTANA DE MERCADO DE INVIERNO ═══
+  ¿Quieres fichar algún jugador? (S/N):   Continúa la temporada sin movimientos.
+
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: UD Las Palmas (72 pts)
+
+  TU RESULTADO — Burgos CF
+  Posición: 13º / 22
+  PJ:42  G-E-P: 16-9-17  GF:67  GC:67  DG:+0  PTS:57
+
+  Objetivo: EVITAR EL DESCENSO
+  ✓  OBJETIVO CUMPLIDO
+
+  Prestigio: ★☆☆☆☆  →  ★★☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  UD Las Palmas             42  21   9  12  66  47  +19   72
+    2  Córdoba CF                42  20  10  12  67  53  +14   70
+    3  Granada CF                42  19  11  12  57  49   +8   68
+    4  SD Eibar                  42  19  10  13  64  55   +9   67
+    5  Sporting Gijón            42  17  14  11  55  45  +10   65
+    6  Albacete Balompié         42  17  13  12  58  50   +8   64
+    7  CD Leganés                42  16  15  11  63  60   +3   63
+    8  Cádiz CF                  42  18   8  16  71  58  +13   62
+    9  Real Zaragoza             42  18   7  17  62  64   -2   61
+   10  CD Mirandés               42  16  11  15  52  55   -3   59
+   11  AD Ceuta FC               42  14  16  12  59  57   +2   58
+   12  SD Huesca                 42  16   9  17  66  59   +7   57
+   13  Burgos CF                 42  16   9  17  67  67   +0   57
+   14  Racing Santander          42  15   9  18  56  65   -9   54
+   15  Real Valladolid CF        42  15   9  18  55  65  -10   54
+   16  UD Almería                42  15   8  19  52  55   -3   53
+   17  CD Castellón              42  13  11  18  61  68   -7   50
+   18  Málaga CF                 42  11  15  16  49  53   -4   48
+   19  Real Sociedad B           42  12  11  19  46  59  -13   47
+   20  Cultural Leonesa          42  11  13  18  42  56  -14   46
+   21  Deportivo de La Coruña    42  12  10  20  38  56  -18   46
+   22  FC Andorra                42  11  12  19  55  65  -10   45
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Álex Lizancos (+2 ME), Aitor Buñuel (+1 ME), Miguel Atienza (+1 CA), David González (+2 ME)
+  BAJAN:    Ander Cantero (-1 VE), Grego Sierra (-1 VE), Pablo Galdames (-1 ME), Miguel Atienza (-1 ME)
+  RETIRAN:  Ningun jugador se retira
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  1. Continuar carrera
+  2. Salir al menu principal
+  Opcion: 

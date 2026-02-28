@@ -1,0 +1,146 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 40 equipos en 1ª RFEF
+  ✓ 2076 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. AD Alcorcón
+       1ª RFEF Grupo 2  ·  Fuerza: 46.8
+       Objetivo: EVITAR EL DESCENSO
+
+  2. Marbella FC
+       1ª RFEF Grupo 2  ·  Fuerza: 47.4
+       Objetivo: EVITAR EL DESCENSO
+
+  3. Atlético Madrileño
+       1ª RFEF Grupo 2  ·  Fuerza: 48.3
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Algeciras CF
+       1ª RFEF Grupo 2  ·  Fuerza: 46.4
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a AD Alcorcón, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : AD Alcorcón           Jornada  : 1/38
+  Objetivo: EVITAR EL DESCENSO
+
+    #  EQUIPO                    PJ  PTS
+    1  CE Europa                  0    0
+    2  Juventud Torremolinos C    0    0
+    3  CD Teruel                  0    0
+        ...
+   14  Algeciras CF               0    0
+   15  Antequera CF               0    0
+   16  AD Alcorcón                0    0 ◄
+       ─── zona de descenso ──
+   17  UD Ibiza                   0    0
+   18  Villarreal CF B            0    0
+   19  SD Tarazona                0    0
+   20  FC Cartagena               0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  Marbella FC  vs  AD Alcorcón
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–38...
+
+  ═══ VENTANA DE MERCADO DE INVIERNO ═══
+  ¿Quieres fichar algún jugador? (S/N):   Continúa la temporada sin movimientos.
+
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: CD Eldense (71 pts)
+
+  TU RESULTADO — AD Alcorcón
+  Posición: 16º / 20
+  PJ:38  G-E-P: 13-7-18  GF:56  GC:61  DG:-5  PTS:46
+
+  Objetivo: EVITAR EL DESCENSO
+  ✓  OBJETIVO CUMPLIDO
+
+  Prestigio: ★☆☆☆☆  →  ★★☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  CD Eldense                38  22   5  11  59  37  +22   71
+    2  CD Teruel                 38  18   9  11  53  44   +9   63
+    3  Real Murcia CF            38  19   5  14  63  48  +15   62
+    4  CE Europa                 38  16  11  11  52  44   +8   59
+    5  Algeciras CF              38  16  10  12  48  43   +5   58
+    6  Hércules CF               38  16  10  12  51  50   +1   58
+    7  SD Tarazona               38  15  12  11  60  52   +8   57
+    8  Gimnàstic de Tarragona    38  15  11  12  57  53   +4   56
+    9  Antequera CF              38  15   9  14  52  56   -4   54
+   10  Marbella FC               38  16   5  17  57  49   +8   53
+   11  Atlético Madrileño        38  13  13  12  57  56   +1   52
+   12  CE Sabadell FC            38  15   6  17  50  65  -15   51
+   13  Betis Deportivo Balompi   38  15   5  18  46  52   -6   50
+   14  Atlético Sanluqueño CF    38  14   5  19  50  63  -13   47
+   15  Juventud Torremolinos C   38  12  10  16  48  51   -3   46
+   16  AD Alcorcón               38  13   7  18  56  61   -5   46
+   17  Villarreal CF B           38  13   7  18  43  49   -6   46
+   18  Sevilla Atlético          38  11  12  15  47  54   -7   45
+   19  UD Ibiza                  38   8  14  16  46  57  -11   38
+   20  FC Cartagena              38   7  16  15  39  50  -11   37
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Sin cambios destacados
+  BAJAN:    Sin bajadas destacadas
+  RETIRAN:  Ningun jugador se retira
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  1. Continuar carrera
+  2. Salir al menu principal
+  Opcion: 

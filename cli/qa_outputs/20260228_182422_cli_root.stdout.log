@@ -1,0 +1,157 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 1092 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. FC Andorra
+       Segunda División  ·  Fuerza: 47.2
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  2. SD Huesca
+       Segunda División  ·  Fuerza: 48.0
+       Objetivo: EVITAR EL DESCENSO
+
+  3. Córdoba CF
+       Segunda División  ·  Fuerza: 48.0
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Burgos CF
+       Segunda División  ·  Fuerza: 48.1
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a FC Andorra, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO DIRECTO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : FC Andorra            Jornada  : 1/42
+  Objetivo: EVITAR EL DESCENSO DIRECTO
+
+    #  EQUIPO                    PJ  PTS
+    1  SD Huesca                  0    0
+    2  Real Valladolid CF         0    0
+    3  Granada CF                 0    0
+        ...
+    7  SD Eibar                   0    0
+    8  Córdoba CF                 0    0
+    9  FC Andorra                 0    0 ◄
+   10  CD Leganés                 0    0
+   11  Deportivo de La Coruña     0    0
+        ...
+   20  CD Mirandés                0    0
+   21  Cultural Leonesa           0    0
+   22  AD Ceuta FC                0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  FC Andorra  vs  UD Las Palmas
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–42...
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: Sporting Gijón (77 pts)
+
+  TU RESULTADO — FC Andorra
+  Posición: 12º / 22
+  PJ:42  G-E-P: 16-10-16  GF:55  GC:55  DG:+0  PTS:58
+
+  Objetivo: EVITAR EL DESCENSO DIRECTO
+  ✓  OBJETIVO CUMPLIDO
+
+  Prestigio: ★☆☆☆☆  →  ★★☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  Sporting Gijón            42  23   8  11  58  41  +17   77
+    2  CD Mirandés               42  21  11  10  70  56  +14   74
+    3  SD Huesca                 42  20  12  10  60  44  +16   72
+    4  CD Castellón              42  20  12  10  73  59  +14   72
+    5  CD Leganés                42  19   9  14  65  53  +12   66
+    6  SD Eibar                  42  19   9  14  51  44   +7   66
+    7  Cádiz CF                  42  18  11  13  67  56  +11   65
+    8  Burgos CF                 42  17  10  15  57  55   +2   61
+    9  Deportivo de La Coruña    42  16  11  15  75  72   +3   59
+   10  Racing Santander          42  16  10  16  75  69   +6   58
+   11  Real Sociedad B           42  17   7  18  65  61   +4   58
+   12  FC Andorra                42  16  10  16  55  55   +0   58
+   13  Cultural Leonesa          42  16   9  17  58  62   -4   57
+   14  Málaga CF                 42  13  15  14  60  58   +2   54
+   15  AD Ceuta FC               42  14  12  16  58  61   -3   54
+   16  Real Zaragoza             42  14   9  19  44  56  -12   51
+   17  UD Almería                42  12  14  16  51  52   -1   50
+   18  UD Las Palmas             42  12  10  20  46  69  -23   46
+   19  Real Valladolid CF        42  10  14  18  56  70  -14   44
+   20  Albacete Balompié         42  10  14  18  51  71  -20   44
+   21  Granada CF                42  10  11  21  47  68  -21   41
+   22  Córdoba CF                42   7  16  19  50  60  -10   37
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Áron Yaakobishvili (+2 ME), Jesús Owono (+1 ME), Gael Alonso (+2 ME), Marc Bombardó (+3 ME)
+  BAJAN:    Nico Ratti (-1 VE), Edgar González (-1 ME), Martí Vilà (-1 ME), Thomas Carrique (-1 ME)
+  RETIRAN:  Ningun jugador se retira
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ¡Hasta la próxima temporada!
+

@@ -71,6 +71,7 @@ fun LigaSelectScreen(
     onMatchday: (Int) -> Unit,
     onTeam: () -> Unit,
     onNews: () -> Unit,
+    onRealFootball: () -> Unit = {},
     onMarket: () -> Unit,
     onCopa: () -> Unit = {},
     onChampions: () -> Unit = {},
@@ -236,6 +237,12 @@ fun LigaSelectScreen(
                         text = "NOTICIAS",
                         onClick = onNews,
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    DosButton(
+                        text = "ACTUALIDAD REAL",
+                        onClick = onRealFootball,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = DosCyan,
                     )
                     DosButton(
                         text = if (ligaState.transferWindowOpen) "MERCADO [ABIERTO]" else "MERCADO",

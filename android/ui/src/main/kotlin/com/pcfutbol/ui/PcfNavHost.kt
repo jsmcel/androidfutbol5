@@ -24,6 +24,7 @@ object Routes {
     const val END_OF_SEASON     = "/end-of-season"
     const val COPA              = "/copa"
     const val CHAMPIONS         = "/champions"
+    const val REAL_FOOTBALL     = "/realfootball"
 
     fun standings(comp: String) = "/standings/$comp"
     fun matchday(round: Int) = "/matchday/$round"
@@ -40,38 +41,39 @@ fun PcfNavHost() {
     ) {
         composable(Routes.MAIN_MENU) {
             MainMenuScreen(
-                onLigaManager    = { navController.navigate(Routes.LIGA_SELECT) },
-                onProManager     = { navController.navigate(Routes.PROMANAGER_OFFERS) },
+                onLigaManager = { navController.navigate(Routes.LIGA_SELECT) },
+                onProManager = { navController.navigate(Routes.PROMANAGER_OFFERS) },
             )
         }
 
         composable(Routes.LIGA_SELECT) {
             LigaSelectScreen(
-                onNavigateUp     = { navController.navigateUp() },
-                onStandings      = { comp -> navController.navigate(Routes.standings(comp)) },
-                onMatchday       = { round -> navController.navigate(Routes.matchday(round)) },
-                onTeam           = { navController.navigate(Routes.TEAM_SQUAD) },
-                onNews           = { navController.navigate(Routes.NEWS) },
-                onMarket         = { navController.navigate(Routes.TRANSFER_MARKET) },
-                onCopa           = { navController.navigate(Routes.COPA) },
-                onStats          = { navController.navigate(Routes.STATS) },
-                onChampions      = { navController.navigate(Routes.CHAMPIONS) },
-                onNationalTeam   = { navController.navigate(Routes.SELECCION) },
+                onNavigateUp = { navController.navigateUp() },
+                onStandings = { comp -> navController.navigate(Routes.standings(comp)) },
+                onMatchday = { round -> navController.navigate(Routes.matchday(round)) },
+                onTeam = { navController.navigate(Routes.TEAM_SQUAD) },
+                onNews = { navController.navigate(Routes.NEWS) },
+                onMarket = { navController.navigate(Routes.TRANSFER_MARKET) },
+                onCopa = { navController.navigate(Routes.COPA) },
+                onStats = { navController.navigate(Routes.STATS) },
+                onChampions = { navController.navigate(Routes.CHAMPIONS) },
+                onRealFootball = { navController.navigate(Routes.REAL_FOOTBALL) },
+                onNationalTeam = { navController.navigate(Routes.SELECCION) },
             )
         }
 
         composable(Routes.PROMANAGER_OFFERS) {
             ProManagerOffersScreen(
-                onNavigateUp     = { navController.navigateUp() },
-                onOfferAccepted  = { navController.navigate(Routes.LIGA_SELECT) },
+                onNavigateUp = { navController.navigateUp() },
+                onOfferAccepted = { navController.navigate(Routes.LIGA_SELECT) },
             )
         }
 
         composable(Routes.TEAM_SQUAD) {
             TeamSquadScreen(
-                onNavigateUp     = { navController.navigateUp() },
-                onLineup         = { navController.navigate(Routes.LINEUP) },
-                onTactic         = { navController.navigate(Routes.TACTIC) },
+                onNavigateUp = { navController.navigateUp() },
+                onLineup = { navController.navigate(Routes.LINEUP) },
+                onTactic = { navController.navigate(Routes.TACTIC) },
             )
         }
 
@@ -91,26 +93,26 @@ fun PcfNavHost() {
             val comp = backStack.arguments?.getString("comp")
                 ?: CompetitionDefinitions.DEFAULT_MANAGER_LEAGUE
             StandingsScreen(
-                competitionCode  = comp,
-                onNavigateUp     = { navController.navigateUp() },
+                competitionCode = comp,
+                onNavigateUp = { navController.navigateUp() },
             )
         }
 
         composable(Routes.MATCHDAY) { backStack ->
             val round = backStack.arguments?.getString("round")?.toIntOrNull() ?: 1
             MatchdayScreen(
-                matchday          = round,
-                onNavigateUp      = { navController.navigateUp() },
-                onMatchResult     = { id -> navController.navigate(Routes.matchResult(id)) },
-                onSeasonComplete  = { navController.navigate(Routes.END_OF_SEASON) },
+                matchday = round,
+                onNavigateUp = { navController.navigateUp() },
+                onMatchResult = { id -> navController.navigate(Routes.matchResult(id)) },
+                onSeasonComplete = { navController.navigate(Routes.END_OF_SEASON) },
             )
         }
 
         composable(Routes.MATCH_RESULT) { backStack ->
             val id = backStack.arguments?.getString("id")?.toIntOrNull() ?: -1
             MatchResultScreen(
-                fixtureId        = id,
-                onNavigateUp     = { navController.navigateUp() },
+                fixtureId = id,
+                onNavigateUp = { navController.navigateUp() },
             )
         }
 
@@ -120,6 +122,10 @@ fun PcfNavHost() {
 
         composable(Routes.NEWS) {
             NewsScreen(onNavigateUp = { navController.navigateUp() })
+        }
+
+        composable(Routes.REAL_FOOTBALL) {
+            RealFootballScreen(onNavigateUp = { navController.navigateUp() })
         }
 
         composable(Routes.SELECCION) {
@@ -135,7 +141,7 @@ fun PcfNavHost() {
                     navController.navigate(Routes.LIGA_SELECT) {
                         popUpTo(Routes.MAIN_MENU)
                     }
-                }
+                },
             )
         }
 

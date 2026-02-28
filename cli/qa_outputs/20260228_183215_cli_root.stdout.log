@@ -1,0 +1,54 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 40 equipos en 1ª RFEF
+  ✓ 2076 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. SD Ponferradina
+       1ª RFEF Grupo 1  ·  Fuerza: 46.7
+       Objetivo: EVITAR EL DESCENSO
+
+  2. Algeciras CF
+       1ª RFEF Grupo 2  ·  Fuerza: 46.4
+       Objetivo: EVITAR EL DESCENSO
+
+  3. CD Lugo
+       1ª RFEF Grupo 1  ·  Fuerza: 47.7
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Arenas Club
+       1ª RFEF Grupo 1  ·  Fuerza: 46.3
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a SD Ponferradina, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO

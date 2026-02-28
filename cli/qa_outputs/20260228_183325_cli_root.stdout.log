@@ -1,0 +1,142 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 40 equipos en 1ª RFEF
+  ✓ 2076 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. Juventud Torremolinos CF
+       1ª RFEF Grupo 2  ·  Fuerza: 45.5
+       Objetivo: EVITAR EL DESCENSO
+
+  2. Zamora CF
+       1ª RFEF Grupo 1  ·  Fuerza: 47.2
+       Objetivo: EVITAR EL DESCENSO
+
+  3. Unionistas CF
+       1ª RFEF Grupo 1  ·  Fuerza: 45.9
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Bilbao Athletic
+       1ª RFEF Grupo 1  ·  Fuerza: 47.2
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a Juventud Torremolinos CF, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : Juventud Torremolinos CF  Jornada  : 1/38
+  Objetivo: EVITAR EL DESCENSO
+
+    #  EQUIPO                    PJ  PTS
+    1  CE Europa                  0    0
+    2  Juventud Torremolinos C    0    0 ◄
+    3  CD Teruel                  0    0
+    4  CD Eldense                 0    0
+        ...
+   18  Villarreal CF B            0    0
+   19  SD Tarazona                0    0
+   20  FC Cartagena               0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  CE Europa  vs  Juventud Torremolinos CF
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–38...
+
+  ═══ VENTANA DE MERCADO DE INVIERNO ═══
+  ¿Quieres fichar algún jugador? (S/N):   Continúa la temporada sin movimientos.
+
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: Gimnàstic de Tarragona (65 pts)
+
+  TU RESULTADO — Juventud Torremolinos CF
+  Posición: 9º / 20
+  PJ:38  G-E-P: 15-8-15  GF:57  GC:55  DG:+2  PTS:53
+
+  Objetivo: EVITAR EL DESCENSO
+  ✓  OBJETIVO CUMPLIDO
+
+  Prestigio: ★☆☆☆☆  →  ★★☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  Gimnàstic de Tarragona    38  17  14   7  57  36  +21   65
+    2  Hércules CF               38  19   8  11  57  49   +8   65
+    3  Antequera CF              38  20   4  14  56  46  +10   64
+    4  Atlético Madrileño        38  17  12   9  56  45  +11   63
+    5  Marbella FC               38  18   9  11  48  40   +8   63
+    6  UD Ibiza                  38  19   6  13  51  46   +5   63
+    7  CD Eldense                38  15   8  15  49  41   +8   53
+    8  FC Cartagena              38  14  11  13  55  50   +5   53
+    9  Juventud Torremolinos C   38  15   8  15  57  55   +2   53
+   10  CE Europa                 38  14  10  14  48  47   +1   52
+   11  Atlético Sanluqueño CF    38  14   9  15  54  56   -2   51
+   12  SD Tarazona               38  13   8  17  58  58   +0   47
+   13  Real Murcia CF            38  11  14  13  52  56   -4   47
+   14  Algeciras CF              38  12  11  15  47  52   -5   47
+   15  Villarreal CF B           38  11  12  15  43  46   -3   45
+   16  CD Teruel                 38  11  12  15  37  47  -10   45
+   17  Sevilla Atlético          38  11  11  16  52  60   -8   44
+   18  Betis Deportivo Balompi   38  11  11  16  47  57  -10   44
+   19  CE Sabadell FC            38  10  10  18  39  56  -17   40
+   20  AD Alcorcón               38  10   8  20  35  55  -20   38
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Sin cambios destacados
+  BAJAN:    Sin bajadas destacadas
+  RETIRAN:  Ningun jugador se retira
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  1. Continuar carrera
+  2. Salir al menu principal
+  Opcion: 

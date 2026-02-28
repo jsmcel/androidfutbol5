@@ -1,0 +1,145 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 40 equipos en 1ª RFEF
+  ✓ 2076 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. Racing Ferrol
+       1ª RFEF Grupo 1  ·  Fuerza: 47.4
+       Objetivo: EVITAR EL DESCENSO
+
+  2. UD Ibiza
+       1ª RFEF Grupo 2  ·  Fuerza: 47.4
+       Objetivo: EVITAR EL DESCENSO
+
+  3. Ourense CF
+       1ª RFEF Grupo 1  ·  Fuerza: 47.6
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Algeciras CF
+       1ª RFEF Grupo 2  ·  Fuerza: 46.4
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a Racing Ferrol, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : Racing Ferrol         Jornada  : 1/38
+  Objetivo: EVITAR EL DESCENSO
+
+    #  EQUIPO                    PJ  PTS
+    1  Mérida AD                  0    0
+    2  Barakaldo CF               0    0
+    3  CP Cacereño                0    0
+    4  Pontevedra CF              0    0
+    5  Racing Ferrol              0    0 ◄
+    6  CD Lugo                    0    0
+    7  Bilbao Athletic            0    0
+        ...
+   18  CD Tenerife                0    0
+   19  CA Osasuna Promesas        0    0
+   20  Ourense CF                 0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  Racing Ferrol  vs  CD Tenerife
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–38...
+
+  ═══ VENTANA DE MERCADO DE INVIERNO ═══
+  ¿Quieres fichar algún jugador? (S/N):   Continúa la temporada sin movimientos.
+
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: Bilbao Athletic (72 pts)
+
+  TU RESULTADO — Racing Ferrol
+  Posición: 6º / 20
+  PJ:38  G-E-P: 16-7-15  GF:47  GC:47  DG:+0  PTS:55
+
+  Objetivo: EVITAR EL DESCENSO
+  ✓  OBJETIVO CUMPLIDO
+
+  Prestigio: ★☆☆☆☆  →  ★★☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  Bilbao Athletic           38  22   6  10  55  36  +19   72
+    2  CA Osasuna Promesas       38  18  11   9  50  46   +4   65
+    3  CF Talavera de la Reina   38  17  13   8  51  41  +10   64
+    4  CD Tenerife               38  18   8  12  69  56  +13   62
+    5  CD Lugo                   38  14  14  10  59  47  +12   56
+    6  Racing Ferrol             38  16   7  15  47  47   +0   55
+    7  RC Celta Fortuna          38  14  12  12  54  54   +0   54
+    8  CP Cacereño               38  15   8  15  52  47   +5   53
+    9  CD Guadalajara            38  14  11  13  50  51   -1   53
+   10  Arenas Club               38  14  11  13  48  50   -2   53
+   11  CD Arenteiro              38  13  12  13  54  52   +2   51
+   12  Ourense CF                38  14   9  15  51  52   -1   51
+   13  Real Madrid Castilla      38  11  17  10  56  53   +3   50
+   14  Mérida AD                 38  13   8  17  53  58   -5   47
+   15  Unionistas CF             38  13   7  18  44  55  -11   46
+   16  Pontevedra CF             38  11  11  16  47  51   -4   44
+   17  Barakaldo CF              38  11  11  16  41  53  -12   44
+   18  Real Avilés Industrial    38  10  11  17  38  44   -6   41
+   19  SD Ponferradina           38  10  11  17  52  61   -9   41
+   20  Zamora CF                 38   7  12  19  37  54  -17   33
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Sin cambios destacados
+  BAJAN:    Sin bajadas destacadas
+  RETIRAN:  Ningun jugador se retira
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  1. Continuar carrera
+  2. Salir al menu principal
+  Opcion: 

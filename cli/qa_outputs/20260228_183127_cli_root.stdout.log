@@ -1,0 +1,54 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 40 equipos en 1ª RFEF
+  ✓ 2076 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. CE Europa
+       1ª RFEF Grupo 2  ·  Fuerza: 46.5
+       Objetivo: EVITAR EL DESCENSO
+
+  2. CD Eldense
+       1ª RFEF Grupo 2  ·  Fuerza: 47.3
+       Objetivo: EVITAR EL DESCENSO
+
+  3. Villarreal CF B
+       1ª RFEF Grupo 2  ·  Fuerza: 46.7
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Real Avilés Industrial
+       1ª RFEF Grupo 1  ·  Fuerza: 46.5
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a CE Europa, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO

@@ -1,0 +1,146 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 40 equipos en 1ª RFEF
+  ✓ 2076 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. Villarreal CF B
+       1ª RFEF Grupo 2  ·  Fuerza: 46.7
+       Objetivo: EVITAR EL DESCENSO
+
+  2. Arenas Club
+       1ª RFEF Grupo 1  ·  Fuerza: 46.3
+       Objetivo: EVITAR EL DESCENSO
+
+  3. CD Lugo
+       1ª RFEF Grupo 1  ·  Fuerza: 47.7
+       Objetivo: EVITAR EL DESCENSO
+
+  4. Real Avilés Industrial
+       1ª RFEF Grupo 1  ·  Fuerza: 46.5
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a Villarreal CF B, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : Villarreal CF B       Jornada  : 1/38
+  Objetivo: EVITAR EL DESCENSO
+
+    #  EQUIPO                    PJ  PTS
+    1  CE Europa                  0    0
+    2  Juventud Torremolinos C    0    0
+    3  CD Teruel                  0    0
+        ...
+   16  AD Alcorcón                0    0
+       ─── zona de descenso ──
+   17  UD Ibiza                   0    0
+   18  Villarreal CF B            0    0 ◄
+   19  SD Tarazona                0    0
+   20  FC Cartagena               0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  Sevilla Atlético  vs  Villarreal CF B
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–38...
+
+  ═══ VENTANA DE MERCADO DE INVIERNO ═══
+  ¿Quieres fichar algún jugador? (S/N):   Continúa la temporada sin movimientos.
+
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: Sevilla Atlético (67 pts)
+
+  TU RESULTADO — Villarreal CF B
+  Posición: 18º / 20
+  PJ:38  G-E-P: 10-13-15  GF:45  GC:53  DG:-8  PTS:43
+
+  Objetivo: EVITAR EL DESCENSO
+  ✗  OBJETIVO NO CUMPLIDO
+
+  ⬇  Villarreal CF B DESCIENDE de Segunda División
+
+  Prestigio: ★☆☆☆☆  →  ★☆☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  Sevilla Atlético          38  20   7  11  65  52  +13   67
+    2  Atlético Sanluqueño CF    38  19   9  10  65  48  +17   66
+    3  Atlético Madrileño        38  19   8  11  63  46  +17   65
+    4  Antequera CF              38  16  14   8  52  44   +8   62
+    5  Algeciras CF              38  15  12  11  53  47   +6   57
+    6  CD Eldense                38  15  12  11  43  39   +4   57
+    7  UD Ibiza                  38  16   9  13  54  52   +2   57
+    8  FC Cartagena              38  15  10  13  55  55   +0   55
+    9  Gimnàstic de Tarragona    38  15   9  14  59  55   +4   54
+   10  Real Murcia CF            38  13  11  14  55  61   -6   50
+   11  SD Tarazona               38  11  16  11  54  55   -1   49
+   12  CE Europa                 38  13  10  15  48  49   -1   49
+   13  CD Teruel                 38  14   5  19  46  52   -6   47
+   14  Hércules CF               38  13   8  17  44  54  -10   47
+   15  CE Sabadell FC            38  12  10  16  53  53   +0   46
+   16  Marbella FC               38  13   7  18  51  56   -5   46
+   17  AD Alcorcón               38  11  11  16  57  65   -8   44
+   18  Villarreal CF B           38  10  13  15  45  53   -8   43
+   19  Juventud Torremolinos C   38  11   9  18  44  56  -12   42
+   20  Betis Deportivo Balompi   38  11   6  21  58  72  -14   39
+
+
+  ═══ EVOLUCION DE TU PLANTILLA ═══
+  MEJORAN:  Sin cambios destacados
+  BAJAN:    Sin bajadas destacadas
+  RETIRAN:  Ningun jugador se retira
+  CANTERANOS: 2 jovenes (17 anos) suben al primer equipo
+
+  1. Continuar carrera
+  2. Salir al menu principal
+  Opcion: 

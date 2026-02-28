@@ -1,0 +1,147 @@
+
+  ╔══════════════════════════════════╗
+  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║
+  ║      Temporada real — Python      ║
+  ╚══════════════════════════════════╝
+
+  Cargando datos de temporada 2025/26...
+  ✓ 20 equipos en Primera División
+  ✓ 22 equipos en Segunda División
+  ✓ 1092 jugadores cargados
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ╔══════════════════════════════════╗
+  ║       MODO PRO MANAGER           ║
+  ╚══════════════════════════════════╝
+
+  ─── NUEVO MANAGER ───
+  Nombre del manager: 
+  ═══ SELECCIÓN DE OFERTA ═══
+  Prestigio: ★☆☆☆☆  |  Temporadas: 0
+
+  1. Real Valladolid CF
+       Segunda División  ·  Fuerza: 47.9
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  2. FC Andorra
+       Segunda División  ·  Fuerza: 47.2
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  3. Albacete Balompié
+       Segunda División  ·  Fuerza: 47.9
+       Objetivo: EVITAR EL DESCENSO DIRECTO
+
+  4. SD Huesca
+       Segunda División  ·  Fuerza: 48.0
+       Objetivo: EVITAR EL DESCENSO
+
+  Elige oferta (1-4): 
+  ¡Bienvenido a Real Valladolid CF, CODEX_QA!
+  Objetivo de la junta: EVITAR EL DESCENSO DIRECTO
+
+  ═══ PROMANAGER · TEMPORADA 2025-26 ═══
+  Manager : CODEX_QA              Prestigio: ★☆☆☆☆
+  Equipo  : Real Valladolid CF    Jornada  : 1/42
+  Objetivo: EVITAR EL DESCENSO DIRECTO
+
+    #  EQUIPO                    PJ  PTS
+    1  SD Huesca                  0    0
+    2  Real Valladolid CF         0    0 ◄
+    3  Granada CF                 0    0
+    4  Albacete Balompié          0    0
+        ...
+   20  CD Mirandés                0    0
+   21  Cultural Leonesa           0    0
+   22  AD Ceuta FC                0    0
+
+  PRÓXIMO PARTIDO — Jornada 1:
+  SD Huesca  vs  Real Valladolid CF
+
+  Táctica: EQUILIBRADO · AL HOMBRE · Presión MEDIA · Toque 50% · Contra 30%
+
+  1. Simular jornada 1
+  2. Clasificación completa
+  3. Plantilla
+  4. Noticias
+  5. Simular resto de temporada
+  6. Mercado de fichajes [ABIERTO]
+  7. Táctica
+  0. Guardar y salir
+  Opción: 
+  Simulando jornadas 1–42...
+  ✓ Temporada completada.
+
+
+  ╔═══════════════════════════════════╗
+  ║        FIN DE TEMPORADA           ║
+  ╚═══════════════════════════════════╝
+
+  🏆 CAMPEÓN: UD Las Palmas (70 pts)
+
+  TU RESULTADO — Real Valladolid CF
+  Posición: 19º / 22
+  PJ:42  G-E-P: 14-7-21  GF:52  GC:65  DG:-13  PTS:49
+
+  Objetivo: EVITAR EL DESCENSO DIRECTO
+  ✗  OBJETIVO NO CUMPLIDO
+
+  ⬇  Real Valladolid CF DESCIENDE de Segunda División
+
+  Prestigio: ★☆☆☆☆  →  ★☆☆☆☆
+
+
+  ═══ Segunda División — 2025-26 ═══
+    #  EQUIPO                    PJ   G   E   P  GF  GC   DG  PTS
+  ──────────────────────────────────────────────────────────────
+    1  UD Las Palmas             42  20  10  12  67  51  +16   70
+    2  Real Sociedad B           42  20   9  13  64  49  +15   69
+    3  SD Eibar                  42  19  12  11  60  52   +8   69
+    4  Real Zaragoza             42  19  10  13  65  45  +20   67
+    5  Granada CF                42  18  11  13  59  50   +9   65
+    6  UD Almería                42  18  10  14  67  60   +7   64
+    7  FC Andorra                42  18  10  14  53  53   +0   64
+    8  AD Ceuta FC               42  16  11  15  60  56   +4   59
+    9  Albacete Balompié         42  17   8  17  55  52   +3   59
+   10  Málaga CF                 42  17   8  17  59  59   +0   59
+   11  Sporting Gijón            42  15  13  14  60  52   +8   58
+   12  Burgos CF                 42  14  16  12  69  63   +6   58
+   13  Córdoba CF                42  15  12  15  56  58   -2   57
+   14  CD Leganés                42  15  11  16  60  56   +4   56
+   15  CD Mirandés               42  16   7  19  56  66  -10   55
+   16  Cultural Leonesa          42  15   9  18  54  55   -1   54
+   17  SD Huesca                 42  15   9  18  53  62   -9   54
+   18  Cádiz CF                  42  14   9  19  52  68  -16   51
+   19  Real Valladolid CF        42  14   7  21  52  65  -13   49
+   20  CD Castellón              42  13   9  20  49  59  -10   48
+   21  Deportivo de La Coruña    42  13   9  20  44  60  -16   48
+   22  Racing Santander          42  12   8  22  41  64  -23   44
+
+  ┌──────────────────────────────────┐
+  │         MENÚ PRINCIPAL           │
+  ├──────────────────────────────────┤
+  │  1. Simular temporada completa   │
+  │  2. Ver plantilla de equipo      │
+  │  3. Partido rápido               │
+  │  4. Top jugadores                │
+  │  5. Ranking de fortaleza         │
+  │  6. PRO MANAGER (modo carrera)  │
+  │  7. MULTIJUGADOR por turnos     │
+  │  8. Actualidad futbolistica      │
+  │  0. Salir                        │
+  └──────────────────────────────────┘
+  Opción: 
+  ¡Hasta la próxima temporada!
+

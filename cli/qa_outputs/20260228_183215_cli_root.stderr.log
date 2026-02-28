@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "C:\Users\Jose-Firebat\proyectos\androidfutbol\cli\pcfutbol_cli.py", line 2483, in <module>
+    main_menu()
+    ~~~~~~~~~^^
+  File "C:\Users\Jose-Firebat\proyectos\androidfutbol\cli\pcfutbol_cli.py", line 2471, in main_menu
+    menu_promanager(liga1, liga2, liga_rfef)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Jose-Firebat\proyectos\androidfutbol\cli\pcfutbol_cli.py", line 2406, in menu_promanager
+    _season_loop(data, liga1, liga2, liga_rfef)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Jose-Firebat\proyectos\androidfutbol\cli\pcfutbol_cli.py", line 2118, in _season_loop
+    mgr_team  = {t.slot_id: t for t in comp_t}[mgr_slot]
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 54
