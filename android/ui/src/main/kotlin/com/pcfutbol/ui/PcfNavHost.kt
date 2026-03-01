@@ -15,6 +15,7 @@ object Routes {
     const val TEAM_SQUAD        = "/team"
     const val CONTRACTS         = "/contracts"
     const val MANAGER_DEPTH     = "/manager-depth"
+    const val PRESIDENT_DESK    = "/president"
     const val LINEUP            = "/lineup"
     const val TACTIC            = "/tactic"
     const val STATS             = "/stats"
@@ -57,6 +58,7 @@ fun PcfNavHost() {
                 onMatchday = { round -> navController.navigate(Routes.matchday(round)) },
                 onTeam = { navController.navigate(Routes.TEAM_SQUAD) },
                 onManagerDepth = { navController.navigate(Routes.MANAGER_DEPTH) },
+                onPresidentDesk = { navController.navigate(Routes.PRESIDENT_DESK) },
                 onNews = { navController.navigate(Routes.NEWS) },
                 onMarket = { navController.navigate(Routes.TRANSFER_MARKET) },
                 onCopa = { navController.navigate(Routes.COPA) },
@@ -89,6 +91,10 @@ fun PcfNavHost() {
 
         composable(Routes.MANAGER_DEPTH) {
             ManagerDepthScreen(onNavigateUp = { navController.navigateUp() })
+        }
+
+        composable(Routes.PRESIDENT_DESK) {
+            PresidentDeskScreen(onNavigateUp = { navController.navigateUp() })
         }
 
         composable(Routes.LINEUP) {

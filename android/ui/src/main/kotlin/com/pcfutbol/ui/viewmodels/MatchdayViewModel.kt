@@ -9,9 +9,13 @@ import com.pcfutbol.core.data.db.SeasonStateDao
 import com.pcfutbol.core.data.db.TacticPresetDao
 import com.pcfutbol.core.data.db.TacticPresetEntity
 import com.pcfutbol.core.data.db.TeamDao
+import com.pcfutbol.core.data.db.allowsCoachMode
+import com.pcfutbol.core.data.db.controlModeLabel
 import com.pcfutbol.core.data.db.managerLeague
+import com.pcfutbol.core.data.db.normalizedControlMode
 import com.pcfutbol.core.data.seed.CompetitionDefinitions
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +38,9 @@ data class MatchdayUiState(
     val teamNames: Map<Int, String> = emptyMap(),
     val managerTeamId: Int = -1,
     val coachCommand: CoachCommand = CoachCommand.BALANCED,
+    val managerControlMode: String = "STANDARD",
+    val managerControlModeLabel: String = "Estandar",
+    val coachCommandsEnabled: Boolean = true,
     val loading: Boolean = false,
     val error: String? = null,
     val seasonComplete: Boolean = false,
@@ -76,15 +83,20 @@ class MatchdayViewModel @Inject constructor(
                 val names = teamIds.mapNotNull { id ->
                     teamDao.byId(id)?.let { id to it.nameShort }
                 }.toMap()
-                val managerTeamId = seasonStateDao.get()?.managerTeamId ?: -1
-                Quad(comp, fixtures, names, managerTeamId)
-            }.onSuccess { (comp, fixtures, names, managerTeamId) ->
+                val seasonState = seasonStateDao.get()
+                val managerTeamId = seasonState?.managerTeamId ?: -1
+                val controlMode = seasonState?.normalizedControlMode ?: "STANDARD"
+                Quint(comp, fixtures, names, managerTeamId, controlMode)
+            }.onSuccess { (comp, fixtures, names, managerTeamId, controlMode) ->
                 _uiState.value = MatchdayUiState(
                     competitionCode = comp,
                     fixtures = fixtures,
                     teamNames = names,
                     managerTeamId = managerTeamId,
-                    coachCommand = _uiState.value.coachCommand,
+                    coachCommand = if (allowsCoachMode(controlMode)) _uiState.value.coachCommand else CoachCommand.BALANCED,
+                    managerControlMode = controlMode,
+                    managerControlModeLabel = controlModeLabel(controlMode),
+                    coachCommandsEnabled = allowsCoachMode(controlMode),
                     loading = false,
                 )
             }.onFailure { throwable ->
@@ -97,22 +109,48 @@ class MatchdayViewModel @Inject constructor(
     }
 
     fun setCoachCommand(command: CoachCommand) {
+        if (!_uiState.value.coachCommandsEnabled) return
         _uiState.value = _uiState.value.copy(coachCommand = command)
     }
 
-    fun simulateMatchday(matchday: Int, seed: Long, command: CoachCommand = _uiState.value.coachCommand) {
+    fun simulateMatchday(
+        matchday: Int,
+        seed: Long,
+        command: CoachCommand = _uiState.value.coachCommand,
+    ): Job {
         val comp = _uiState.value.competitionCode
-        viewModelScope.launch {
+        return viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true, error = null)
             runCatching {
-                applyCoachCommand(command)
+                if (_uiState.value.coachCommandsEnabled) {
+                    applyCoachCommand(command)
+                } else {
+                    applyCoachCommand(CoachCommand.BALANCED)
+                }
                 competitionRepository.advanceMatchday(comp, matchday, seed)
             }.onSuccess {
-                loadMatchday(matchday)
+                val fixtures = competitionRepository.fixtures(comp)
+                    .first()
+                    .filter { it.matchday == matchday }
+                val teamIds = fixtures.flatMap { listOf(it.homeTeamId, it.awayTeamId) }.toSet()
+                val names = teamIds.mapNotNull { id ->
+                    teamDao.byId(id)?.let { id to it.nameShort }
+                }.toMap()
+                val seasonState = seasonStateDao.get()
+                val managerTeamId = seasonState?.managerTeamId ?: -1
+                val controlMode = seasonState?.normalizedControlMode ?: _uiState.value.managerControlMode
                 val pending = competitionRepository.pendingFixtures(comp)
-                if (pending == 0) {
-                    _uiState.value = _uiState.value.copy(seasonComplete = true)
-                }
+                _uiState.value = _uiState.value.copy(
+                    fixtures = fixtures,
+                    teamNames = names,
+                    managerTeamId = managerTeamId,
+                    managerControlMode = controlMode,
+                    managerControlModeLabel = controlModeLabel(controlMode),
+                    coachCommandsEnabled = allowsCoachMode(controlMode),
+                    coachCommand = if (allowsCoachMode(controlMode)) _uiState.value.coachCommand else CoachCommand.BALANCED,
+                    loading = false,
+                    seasonComplete = pending == 0,
+                )
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     loading = false,
@@ -190,5 +228,13 @@ class MatchdayViewModel @Inject constructor(
         val second: B,
         val third: C,
         val fourth: D,
+    )
+
+    private data class Quint<A, B, C, D, E>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D,
+        val fifth: E,
     )
 }

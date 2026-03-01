@@ -351,6 +351,7 @@ class SeedLoader @Inject constructor(
                 phase = "PRESEASON",
                 managerTeamId = -1,
                 managerMode = "MANAGER:${CompetitionDefinitions.DEFAULT_MANAGER_LEAGUE}",
+                managerControlMode = com.pcfutbol.core.data.db.CONTROL_MODE_STANDARD,
                 transferWindowOpen = true,
                 objectivesMet = false,
             )

@@ -74,8 +74,8 @@ class MatchSimulatorTest {
         val away = makeTeam(2, "B", 65)
         repeat(500) { seed ->
             val r = MatchSimulator.simulate(MatchContext(1, home, away, seed.toLong()))
-            assertTrue(r.homeGoals in 0..9, "homeGoals fuera de rango: ${r.homeGoals}")
-            assertTrue(r.awayGoals in 0..9, "awayGoals fuera de rango: ${r.awayGoals}")
+            assertTrue(r.homeGoals in 0..8, "homeGoals fuera de rango: ${r.homeGoals}")
+            assertTrue(r.awayGoals in 0..8, "awayGoals fuera de rango: ${r.awayGoals}")
         }
     }
 

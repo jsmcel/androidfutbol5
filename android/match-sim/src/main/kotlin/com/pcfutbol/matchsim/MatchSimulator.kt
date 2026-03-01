@@ -15,6 +15,40 @@ object MatchSimulator {
     // VAR: probabilidad de revisión y anulación (mismos valores que el CLI)
     private const val VAR_REVIEW_PROB   = 0.18   // 18% de revisión tras gol
     private const val VAR_DISALLOW_PROB = 0.38   // 38% de anulación cuando hay revisión
+    private const val LAMBDA_BASE = 0.29
+    private const val LAMBDA_SPAN = 1.78
+    private const val HOME_GOAL_BONUS = 1.08
+    private const val MAX_GOALS_PER_TEAM = 8
+    private val LEAGUE_GOAL_FACTOR = mapOf(
+        "ES1" to 0.93,
+        "ES2" to 0.81,
+        "GB1" to 1.08,
+        "IT1" to 1.02,
+        "L1" to 1.15,
+        "FR1" to 1.02,
+        "NL1" to 1.12,
+        "PO1" to 0.96,
+        "BE1" to 1.08,
+        "TR1" to 1.04,
+    )
+    private val NARRATION_ATTACK = listOf(
+        "%s pisa area con peligro.",
+        "%s rompe lineas y ataca por dentro.",
+        "%s fuerza al rival a defender muy atras.",
+        "%s aprieta y gana metros por banda.",
+    )
+    private val NARRATION_DEFENSE = listOf(
+        "%s sostiene la posesion y enfria el ritmo.",
+        "%s repliega bien y cierra espacios.",
+        "%s protege el resultado con orden.",
+        "%s aguanta en bloque bajo y despeja.",
+    )
+    private val NARRATION_MID = listOf(
+        "Duelo tactico en la medular.",
+        "Partido abierto con intercambio de golpes.",
+        "Fase de control sin dominador claro.",
+        "Mucho ritmo y choques en el centro del campo.",
+    )
 
     /**
      * Simula un partido y devuelve el resultado con eventos.
@@ -33,6 +67,7 @@ object MatchSimulator {
         val awayStrength = StrengthCalculator.calculate(ctx.away)
         val disciplineSummary = generateDisciplinaryEvents(ctx, rng)
         val pace = paceAdjustments(ctx)
+        val compFactor = competitionGoalFactor(ctx.home.competitionCode, ctx.away.competitionCode)
 
         // λ de Poisson calibrado con ventaja local (+12%)
         val homeLambda = applyPaceFactor(
@@ -40,14 +75,14 @@ object MatchSimulator {
             lambda = strengthToLambda(homeStrength, isHome = !ctx.neutral),
             redCards = disciplineSummary.homeRedCards,
             ),
-            pace.homeFactor,
+            pace.homeFactor * compFactor,
         )
         val awayLambda = applyPaceFactor(
             applyExpulsionPenalty(
             lambda = strengthToLambda(awayStrength, isHome = false),
             redCards = disciplineSummary.awayRedCards,
             ),
-            pace.awayFactor,
+            pace.awayFactor * compFactor,
         )
 
         val homeGoalsRaw = poissonSample(homeLambda, rng)
@@ -62,6 +97,8 @@ object MatchSimulator {
         val awayGoals = awayVarResult.goalsAfterVar
 
         val goalEvents = generateGoalEvents(ctx, homeGoals, awayGoals, rng)
+        val tacticalStops = generateTacticalStopEvents(ctx, rng)
+        val narrationEvents = generateNarrationEvents(ctx, rng)
 
         // Tiempo añadido: base + amarillas/10 + VAR reviews + goles
         val totalYellows = disciplineSummary.events.count { it.type == EventType.YELLOW_CARD }
@@ -71,7 +108,12 @@ object MatchSimulator {
         val addedTime1 = (addedBase / 2 + rng.nextInt(1, 4)).coerceIn(1, 6)
         val addedTime2 = (addedBase / 2 + rng.nextInt(2, 6)).coerceIn(2, 10)
 
-        val allEvents = (disciplineSummary.events + injuryEvents + goalEvents + timeWastingSummary.events
+        val allEvents = (disciplineSummary.events +
+                injuryEvents +
+                goalEvents +
+                tacticalStops +
+                narrationEvents +
+                timeWastingSummary.events
                 + homeVarResult.varEvents + awayVarResult.varEvents)
             .sortedBy { it.minute }
 
@@ -93,16 +135,14 @@ object MatchSimulator {
     // Modelo Poisson
 
     /**
-     * Convierte fortaleza (10..99) a lambda de Poisson (0.4..3.0).
-     * Calibrado para producir ~1.4 goles/equipo promedio (media real de LaLiga).
+     * Convierte fortaleza (10..99) a lambda de Poisson.
+     * Calibrado para medias globales realistas (~2.4-2.9 goles por partido).
      */
     private fun strengthToLambda(strength: Double, isHome: Boolean): Double {
         // Normalizar strength a 0..1
         val norm = (strength - 10.0) / 89.0
-        // Escala logarítmica: lambda ∈ [0.4, 3.0]
-        val lambda = 0.4 + norm * 2.6
-        // Ventaja local: +12% en goles para el local
-        return if (isHome) lambda * 1.12 else lambda
+        val lambda = LAMBDA_BASE + norm * LAMBDA_SPAN
+        return if (isHome) lambda * HOME_GOAL_BONUS else lambda
     }
 
     /**
@@ -116,7 +156,7 @@ object MatchSimulator {
             k++
             p *= rng.nextDouble()
         } while (p > l)
-        return (k - 1).coerceIn(0, 9)
+        return (k - 1).coerceIn(0, MAX_GOALS_PER_TEAM)
     }
 
     // -------------------------------------------------------------------------
@@ -142,13 +182,25 @@ object MatchSimulator {
         repeat(goals) {
             if (rng.nextDouble() < VAR_REVIEW_PROB) {
                 reviews++
+                val player = pickAnyPlayer(team, rng)
+                val playerName = player?.playerName?.takeIf { it.isNotBlank() }
+                val reviewMinute = rng.nextInt(1, 95)
+                events += MatchEvent(
+                    minute = reviewMinute,
+                    type = EventType.VAR_REVIEW,
+                    teamId = team.teamId,
+                    playerId = player?.playerId?.takeIf { it > 0 },
+                    playerName = playerName,
+                    description = if (playerName != null)
+                        "VAR revisando accion de $playerName (${team.teamName})"
+                    else
+                        "VAR revisando accion de ${team.teamName}",
+                )
                 if (rng.nextDouble() < VAR_DISALLOW_PROB) {
                     remaining--
                     disallowed++
-                    val player = pickAnyPlayer(team, rng)
-                    val playerName = player?.playerName?.takeIf { it.isNotBlank() }
                     events += MatchEvent(
-                        minute = rng.nextInt(1, 95),
+                        minute = (reviewMinute + rng.nextInt(0, 2)).coerceAtMost(95),
                         type = EventType.VAR_DISALLOWED,
                         teamId = team.teamId,
                         playerId = player?.playerId?.takeIf { it > 0 },
@@ -198,6 +250,12 @@ object MatchSimulator {
 
     private fun applyPaceFactor(lambda: Double, paceFactor: Double): Double =
         (lambda * paceFactor).coerceAtLeast(0.1)
+
+    private fun competitionGoalFactor(homeComp: String, awayComp: String): Double {
+        val hf = LEAGUE_GOAL_FACTOR[homeComp] ?: 1.0
+        val af = LEAGUE_GOAL_FACTOR[awayComp] ?: 1.0
+        return ((hf + af) * 0.5).coerceIn(0.75, 1.20)
+    }
 
     private fun generateTimeWastingEvents(
         ctx: MatchContext,
@@ -282,6 +340,66 @@ object MatchSimulator {
         val events = mutableListOf<MatchEvent>()
         repeat(homeGoals) { events += createGoalEvent(ctx.home, rng) }
         repeat(awayGoals) { events += createGoalEvent(ctx.away, rng) }
+        return events
+    }
+
+    private fun generateTacticalStopEvents(
+        ctx: MatchContext,
+        rng: Random,
+    ): List<MatchEvent> {
+        val checkpoints = listOf(25, 40, 55, 70, 85)
+        return checkpoints.mapNotNull { minute ->
+            if (rng.nextDouble() >= 0.78) return@mapNotNull null
+            val homeSide = rng.nextBoolean()
+            val team = if (homeSide) ctx.home else ctx.away
+            MatchEvent(
+                minute = minute,
+                type = EventType.TACTICAL_STOP,
+                teamId = team.teamId,
+                description = when (rng.nextInt(3)) {
+                    0 -> "Parada tactica: ajustes desde el banquillo de ${team.teamName}."
+                    1 -> "Ventana de decisiones para ${team.teamName}."
+                    else -> "Tramo clave: ${team.teamName} mueve piezas tacticas."
+                },
+            )
+        }
+    }
+
+    private fun generateNarrationEvents(
+        ctx: MatchContext,
+        rng: Random,
+    ): List<MatchEvent> {
+        val events = mutableListOf<MatchEvent>()
+        for (minute in 3..90 step 3) {
+            val pick = rng.nextInt(100)
+            if (pick < 35) {
+                val team = if (rng.nextBoolean()) ctx.home else ctx.away
+                val phrase = NARRATION_ATTACK[rng.nextInt(NARRATION_ATTACK.size)].format(team.teamName)
+                events += MatchEvent(
+                    minute = minute,
+                    type = EventType.NARRATION,
+                    teamId = team.teamId,
+                    description = "NARRADOR: $phrase",
+                )
+            } else if (pick < 70) {
+                val team = if (rng.nextBoolean()) ctx.home else ctx.away
+                val phrase = NARRATION_DEFENSE[rng.nextInt(NARRATION_DEFENSE.size)].format(team.teamName)
+                events += MatchEvent(
+                    minute = minute,
+                    type = EventType.NARRATION,
+                    teamId = team.teamId,
+                    description = "NARRADOR: $phrase",
+                )
+            } else {
+                val phrase = NARRATION_MID[rng.nextInt(NARRATION_MID.size)]
+                events += MatchEvent(
+                    minute = minute,
+                    type = EventType.NARRATION,
+                    teamId = -1,
+                    description = "NARRADOR: $phrase",
+                )
+            }
+        }
         return events
     }
 

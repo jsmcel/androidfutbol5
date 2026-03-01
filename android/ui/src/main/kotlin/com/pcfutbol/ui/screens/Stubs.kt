@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -53,10 +54,13 @@ import com.pcfutbol.ui.components.DosButton
 import com.pcfutbol.ui.components.DosPanel
 import com.pcfutbol.ui.components.MatchResultRow
 import com.pcfutbol.ui.theme.*
+import kotlinx.coroutines.Job
 import com.pcfutbol.ui.viewmodels.LigaSelectViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import java.util.UUID
+import kotlin.random.Random
 
 /**
  * Pantallas stub — serán implementadas en sprints sucesivos.
@@ -72,6 +76,7 @@ fun LigaSelectScreen(
     onMatchday: (Int) -> Unit,
     onTeam: () -> Unit,
     onManagerDepth: () -> Unit = {},
+    onPresidentDesk: () -> Unit = {},
     onNews: () -> Unit,
     onRealFootball: () -> Unit = {},
     onMarket: () -> Unit,
@@ -209,6 +214,20 @@ fun LigaSelectScreen(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
                     )
+                    DosButton(
+                        text = "NIVEL CONTROL: ${ligaState.managerControlModeLabel}",
+                        onClick = { vm.cycleControlMode() },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = if (ligaState.managerControlMode == "TOTAL") DosGreen else DosCyan,
+                    )
+                    if (!ligaState.managerDepthEnabled) {
+                        Text(
+                            text = "Modo Basico: staff y modo entrenador desactivados.",
+                            color = DosGray,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -246,7 +265,23 @@ fun LigaSelectScreen(
                         onClick = onManagerDepth,
                         modifier = Modifier.fillMaxWidth(),
                         color = DosYellow,
+                        enabled = ligaState.managerDepthEnabled,
                     )
+                    DosButton(
+                        text = "DESPACHO DEL PRESIDENTE",
+                        onClick = onPresidentDesk,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = if (ligaState.presidentDeskEnabled) DosGreen else DosGray,
+                        enabled = ligaState.presidentDeskEnabled,
+                    )
+                    if (!ligaState.presidentDeskEnabled) {
+                        Text(
+                            text = "Disponible solo en nivel Total.",
+                            color = DosGray,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                        )
+                    }
                     DosButton(
                         text = "NOTICIAS",
                         onClick = onNews,
@@ -374,7 +409,94 @@ private data class MatchEvent(
     val isManagerTeamGoal: Boolean = false,
 )
 
-private enum class EventType { GOAL, YELLOW_CARD, RED_CARD, SUBSTITUTION, KICKOFF }
+private enum class EventType {
+    GOAL,
+    YELLOW_CARD,
+    RED_CARD,
+    SUBSTITUTION,
+    INJURY,
+    VAR,
+    TIME_WASTING,
+    NARRATION,
+    KICKOFF,
+}
+
+private data class TimelineEvent(
+    val minute: Int,
+    val type: String,
+    val description: String,
+    val teamId: Int?,
+)
+
+private const val HUMAN_MATCH_TICK_MS = 3500L
+private const val HUMAN_EVENT_GAP_MS = 260L
+private const val HUMAN_NARRATION_EVERY_MINUTES = 3
+
+private val NARRATION_ATTACK = listOf(
+    "NARRADOR: %s pisa area con mucho peligro.",
+    "NARRADOR: %s acelera por dentro y hace dano.",
+    "NARRADOR: %s encierra al rival en su campo.",
+)
+
+private val NARRATION_DEFENSE = listOf(
+    "NARRADOR: %s aprieta y obliga a replegar.",
+    "NARRADOR: %s empuja y carga por banda.",
+    "NARRADOR: %s encuentra espacios entre lineas.",
+)
+
+private val NARRATION_MID = listOf(
+    "NARRADOR: choque tactico en el centro del campo.",
+    "NARRADOR: ritmo alto y muchas disputas en la medular.",
+    "NARRADOR: fase de control con tension en ambos banquillos.",
+)
+
+private fun parseTimelineEvents(eventsJson: String): List<TimelineEvent> {
+    if (eventsJson.isBlank()) return emptyList()
+    return runCatching {
+        val arr = JSONArray(eventsJson)
+        buildList {
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val minute = obj.optInt("minute", 1).coerceIn(1, 120)
+                val type = obj.optString("type", "")
+                val description = obj.optString("description", "Evento de partido")
+                val teamId = if (obj.has("teamId") && !obj.isNull("teamId")) obj.optInt("teamId") else null
+                add(TimelineEvent(minute, type, description, teamId))
+            }
+        }.sortedBy { it.minute }
+    }.getOrDefault(emptyList())
+}
+
+private fun mapEventType(rawType: String): EventType = when (rawType.uppercase()) {
+    "GOAL", "OWN_GOAL" -> EventType.GOAL
+    "YELLOW_CARD" -> EventType.YELLOW_CARD
+    "RED_CARD" -> EventType.RED_CARD
+    "SUBSTITUTION" -> EventType.SUBSTITUTION
+    "INJURY" -> EventType.INJURY
+    "VAR_DISALLOWED" -> EventType.VAR
+    "TIME_WASTING" -> EventType.TIME_WASTING
+    else -> EventType.NARRATION
+}
+
+private fun driftBallZone(currentZone: Int, rng: Random): Int {
+    val delta = when (rng.nextInt(100)) {
+        in 0..24 -> -1
+        in 25..49 -> 1
+        else -> 0
+    }
+    return (currentZone + delta).coerceIn(0, 4)
+}
+
+private fun narrationForZone(
+    ballZone: Int,
+    managerTeamName: String,
+    rivalTeamName: String,
+    rng: Random,
+): String = when {
+    ballZone <= 1 -> NARRATION_ATTACK.random(rng).format(managerTeamName)
+    ballZone >= 3 -> NARRATION_DEFENSE.random(rng).format(rivalTeamName)
+    else -> NARRATION_MID.random(rng)
+}
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -386,7 +508,8 @@ fun MatchdayScreen(
     vm: com.pcfutbol.ui.viewmodels.MatchdayViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsState()
-    
+    val scope = rememberCoroutineScope()
+
     // Estados para UI
     var buttonState by remember { mutableStateOf(SimulateButtonState.IDLE) }
     var selectedFixtureIndex by remember { mutableIntStateOf(0) }
@@ -394,20 +517,40 @@ fun MatchdayScreen(
     var ballZone by remember { mutableIntStateOf(2) } // 0=portería rival, 1=mitad rival, 2=centro, 3=mitad propia, 4=portería propia
     var homeScore by remember { mutableIntStateOf(0) }
     var awayScore by remember { mutableIntStateOf(0) }
+    var minuteDisplay by remember { mutableIntStateOf(1) }
+    var playbackJob by remember { mutableStateOf<Job?>(null) }
     var flashColor by remember { mutableStateOf<Color?>(null) }
-    
+
+    fun pushEvent(event: MatchEvent) {
+        events.add(0, event)
+        if (events.size > 140) {
+            events.removeAt(events.lastIndex)
+        }
+    }
+
     LaunchedEffect(matchday) {
+        playbackJob?.cancel()
         vm.loadMatchday(matchday)
         events.clear()
         homeScore = 0
         awayScore = 0
+        minuteDisplay = 1
+        ballZone = 2
         buttonState = SimulateButtonState.IDLE
-        events.add(MatchEvent(minute = 1, type = EventType.KICKOFF, description = "INICIO del partido"))
+        pushEvent(MatchEvent(minute = 1, type = EventType.KICKOFF, description = "INICIO DEL PARTIDO"))
+    }
+    LaunchedEffect(state.fixtures, state.managerTeamId) {
+        if (state.fixtures.isNotEmpty() && state.managerTeamId > 0) {
+            val managerIndex = state.fixtures.indexOfFirst {
+                it.homeTeamId == state.managerTeamId || it.awayTeamId == state.managerTeamId
+            }
+            if (managerIndex >= 0) selectedFixtureIndex = managerIndex
+        }
     }
     LaunchedEffect(state.seasonComplete) {
         if (state.seasonComplete) onSeasonComplete()
     }
-    
+
     // Animación de flash cuando hay gol
     val animatedFlashColor by animateColorAsState(
         targetValue = flashColor ?: Color.Transparent,
@@ -464,45 +607,115 @@ fun MatchdayScreen(
                 onClick = {
                     when (buttonState) {
                         SimulateButtonState.IDLE -> {
-                            buttonState = SimulateButtonState.LOADING
-                            vm.simulateMatchday(matchday, System.currentTimeMillis())
-                            // Simulación visual: cambiar zonas de la pelota y agregar eventos
-                            kotlinx.coroutines.GlobalScope.launch {
-                                delay(500)
-                                ballZone = 3
-                                delay(800)
-                                ballZone = 1
-                                delay(600)
-                                // Gol local simulado
-                                homeScore++
-                                flashColor = DosGreen
-                                events.add(0, MatchEvent(
-                                    minute = 23,
-                                    type = EventType.GOAL,
-                                    description = "GOL — $homeTeamName",
-                                    isManagerTeamGoal = true
-                                ))
+                            playbackJob?.cancel()
+                            playbackJob = scope.launch {
+                                buttonState = SimulateButtonState.LOADING
+                                events.clear()
+                                homeScore = 0
+                                awayScore = 0
+                                minuteDisplay = 1
                                 ballZone = 2
-                                delay(1000)
-                                ballZone = 3
-                                delay(700)
-                                // Tarjeta amarilla
-                                events.add(0, MatchEvent(
-                                    minute = 18,
-                                    type = EventType.YELLOW_CARD,
-                                    description = "Amarilla — $awayTeamName"
-                                ))
+                                pushEvent(MatchEvent(minute = 1, type = EventType.KICKOFF, description = "INICIO DEL PARTIDO"))
+
+                                val simJob = vm.simulateMatchday(matchday, System.currentTimeMillis())
+                                simJob.join()
+
+                                val refreshedState = vm.uiState.value
+                                val fixture = refreshedState.fixtures.getOrNull(selectedFixtureIndex)
+                                if (fixture == null || !fixture.played) {
+                                    buttonState = SimulateButtonState.IDLE
+                                    return@launch
+                                }
+
+                                val managerTeamId = refreshedState.managerTeamId
+                                val managerIsHome = managerTeamId == fixture.homeTeamId
+                                val managerTeam = if (managerIsHome) homeTeamName else awayTeamName
+                                val rivalTeam = if (managerIsHome) awayTeamName else homeTeamName
+                                val timeline = parseTimelineEvents(fixture.eventsJson)
+                                val grouped = timeline.groupBy { it.minute }
+                                val maxMinute = maxOf(90, timeline.maxOfOrNull { it.minute } ?: 90).coerceAtMost(99)
+                                val rng = Random((fixture.seed xor 0x4F1BBCDCL).toInt())
+
+                                for (minute in 1..maxMinute) {
+                                    minuteDisplay = minute
+                                    val minuteEvents = grouped[minute].orEmpty()
+
+                                    if (minuteEvents.isEmpty()) {
+                                        ballZone = driftBallZone(ballZone, rng)
+                                    } else {
+                                        minuteEvents.forEach { raw ->
+                                            val type = mapEventType(raw.type)
+                                            val teamIsManager = raw.teamId != null && raw.teamId == managerTeamId
+                                            if (raw.teamId != null) {
+                                                ballZone = when {
+                                                    teamIsManager -> if (rng.nextBoolean()) 1 else 0
+                                                    else -> if (rng.nextBoolean()) 3 else 4
+                                                }
+                                            } else {
+                                                ballZone = driftBallZone(ballZone, rng)
+                                            }
+
+                                            if (type == EventType.GOAL) {
+                                                when (raw.teamId) {
+                                                    fixture.homeTeamId -> homeScore += 1
+                                                    fixture.awayTeamId -> awayScore += 1
+                                                }
+                                                flashColor = if (teamIsManager) DosGreen else DosRed
+                                            } else if (type == EventType.VAR) {
+                                                flashColor = DosYellow
+                                            }
+
+                                            val desc = when (type) {
+                                                EventType.VAR -> "VAR: ${raw.description}"
+                                                EventType.TIME_WASTING -> raw.description.ifBlank { "Perdida de tiempo" }
+                                                else -> raw.description
+                                            }
+                                            pushEvent(
+                                                MatchEvent(
+                                                    minute = minute,
+                                                    type = type,
+                                                    description = desc,
+                                                    isManagerTeamGoal = type == EventType.GOAL && teamIsManager,
+                                                )
+                                            )
+                                            delay(HUMAN_EVENT_GAP_MS)
+                                        }
+                                    }
+
+                                    if (minute % HUMAN_NARRATION_EVERY_MINUTES == 0) {
+                                        pushEvent(
+                                            MatchEvent(
+                                                minute = minute,
+                                                type = EventType.NARRATION,
+                                                description = narrationForZone(ballZone, managerTeam, rivalTeam, rng),
+                                            )
+                                        )
+                                    }
+                                    delay(HUMAN_MATCH_TICK_MS)
+                                }
+
+                                homeScore = fixture.homeGoals.coerceAtLeast(0)
+                                awayScore = fixture.awayGoals.coerceAtLeast(0)
                                 ballZone = 2
+                                pushEvent(
+                                    MatchEvent(
+                                        minute = maxMinute,
+                                        type = EventType.NARRATION,
+                                        description = "FINAL: $homeTeamName $homeScore-$awayScore $awayTeamName",
+                                    )
+                                )
                                 buttonState = SimulateButtonState.DONE
                             }
                         }
                         SimulateButtonState.DONE -> {
-                            // Siguiente jornada o reset
+                            playbackJob?.cancel()
                             buttonState = SimulateButtonState.IDLE
                             events.clear()
-                            events.add(MatchEvent(minute = 1, type = EventType.KICKOFF, description = "INICIO del partido"))
+                            pushEvent(MatchEvent(minute = 1, type = EventType.KICKOFF, description = "INICIO DEL PARTIDO"))
                             homeScore = 0
                             awayScore = 0
+                            minuteDisplay = 1
+                            ballZone = 2
                         }
                         SimulateButtonState.LOADING -> { /* no-op */ }
                     }
@@ -532,46 +745,56 @@ fun MatchdayScreen(
                 )
             }
             
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                // Equipo local
-                Text(
-                    text = homeTeamName.take(14).uppercase(),
-                    color = DosCyan,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.width(100.dp),
-                    textAlign = TextAlign.End,
-                )
-                
-                // Marcador con animación
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    AnimatedScoreDigit(homeScore, flashColor == DosGreen)
+                    // Equipo local
                     Text(
-                        text = "-",
-                        color = DosWhite,
+                        text = homeTeamName.take(14).uppercase(),
+                        color = DosCyan,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
+                        fontSize = 14.sp,
                         fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.width(100.dp),
+                        textAlign = TextAlign.End,
                     )
-                    AnimatedScoreDigit(awayScore, flashColor == DosYellow)
+
+                    // Marcador con animación
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AnimatedScoreDigit(homeScore, flashColor == DosGreen)
+                        Text(
+                            text = "-",
+                            color = DosWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                        AnimatedScoreDigit(awayScore, flashColor == DosYellow)
+                    }
+
+                    // Equipo visitante
+                    Text(
+                        text = awayTeamName.take(14).uppercase(),
+                        color = DosLightGray,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.width(100.dp),
+                        textAlign = TextAlign.Start,
+                    )
                 }
-                
-                // Equipo visitante
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = awayTeamName.take(14).uppercase(),
-                    color = DosLightGray,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    text = "MIN ${minuteDisplay.toString().padStart(2, '0')}'",
+                    color = DosYellow,
+                    fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.width(100.dp),
-                    textAlign = TextAlign.Start,
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -667,84 +890,87 @@ private fun LivePitchView(
     homeTeamColor: Color,
     awayTeamColor: Color,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val fieldWidth = maxWidth
+        val fieldHeight = maxHeight
+        val tokenSize = 12.dp
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            
+
             // Fondo verde con gradiente
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         Color(0xFF0a2e0a),
                         Color(0xFF143d14),
-                        Color(0xFF0a2e0a)
+                        Color(0xFF0a2e0a),
                     ),
                     startY = 0f,
-                    endY = h
+                    endY = h,
                 )
             )
-            
+
             // Líneas blancas del campo
             val lineColor = Color.White.copy(alpha = 0.6f)
             val stroke = Stroke(width = 2f)
-            
+
             // Bordes del campo
             drawRect(
                 color = lineColor,
                 topLeft = Offset(w * 0.05f, h * 0.05f),
                 size = Size(w * 0.9f, h * 0.9f),
-                style = stroke
+                style = stroke,
             )
-            
+
             // Línea de medio campo
             drawLine(
                 color = lineColor,
                 start = Offset(w * 0.05f, h * 0.5f),
                 end = Offset(w * 0.95f, h * 0.5f),
-                strokeWidth = 2f
+                strokeWidth = 2f,
             )
-            
+
             // Círculo central
             drawCircle(
                 color = lineColor,
                 radius = w * 0.18f,
                 center = Offset(w * 0.5f, h * 0.5f),
-                style = stroke
+                style = stroke,
             )
-            
+
             // Área grande local (abajo)
             drawRect(
                 color = lineColor,
                 topLeft = Offset(w * 0.19f, h * 0.73f),
                 size = Size(w * 0.62f, h * 0.22f),
-                style = stroke
+                style = stroke,
             )
-            
+
             // Punto de penalty local
             drawCircle(
                 color = lineColor,
                 radius = 3f,
-                center = Offset(w * 0.5f, h * 0.85f)
+                center = Offset(w * 0.5f, h * 0.85f),
             )
-            
+
             // Área grande visitante (arriba)
             drawRect(
                 color = lineColor,
                 topLeft = Offset(w * 0.19f, h * 0.05f),
                 size = Size(w * 0.62f, h * 0.22f),
-                style = stroke
+                style = stroke,
             )
-            
+
             // Punto de penalty visitante
             drawCircle(
                 color = lineColor,
                 radius = 3f,
-                center = Offset(w * 0.5f, h * 0.15f)
+                center = Offset(w * 0.5f, h * 0.15f),
             )
         }
-        
-        // Fichas de jugadores (posiciones fijas en % del contenedor)
+
         // Formación 4-3-3 para ambos equipos
         val homeFormation = listOf(
             0.50f to 0.90f, // GK
@@ -752,54 +978,42 @@ private fun LivePitchView(
             0.25f to 0.55f, 0.50f to 0.55f, 0.75f to 0.55f, // 3 MID
             0.20f to 0.38f, 0.50f to 0.35f, 0.80f to 0.38f, // 3 ATT
         )
-        
         val awayFormation = listOf(
             0.50f to 0.10f, // GK
             0.15f to 0.28f, 0.38f to 0.28f, 0.62f to 0.28f, 0.85f to 0.28f, // 4 DEF
             0.25f to 0.45f, 0.50f to 0.45f, 0.75f to 0.45f, // 3 MID
             0.20f to 0.62f, 0.50f to 0.65f, 0.80f to 0.62f, // 3 ATT
         )
-        
-        // Dibujar fichas locales (cyan) - posiciones relativas al Box
+
         homeFormation.forEach { (relX, relY) ->
             Box(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(0.08f)
-                        .absoluteOffset(
-                            x = (relX * 100).dp,
-                            y = (relY * 100).dp
-                        )
-                        .background(homeTeamColor.copy(alpha = 0.8f), CircleShape)
-                        .border(1.5.dp, homeTeamColor, CircleShape)
-                )
-            }
+                modifier = Modifier
+                    .offset(
+                        x = fieldWidth * relX - tokenSize / 2,
+                        y = fieldHeight * relY - tokenSize / 2,
+                    )
+                    .size(tokenSize)
+                    .background(homeTeamColor.copy(alpha = 0.8f), CircleShape)
+                    .border(1.5.dp, homeTeamColor, CircleShape)
+            )
         }
-        
-        // Dibujar fichas visitantes (gris)
         awayFormation.forEach { (relX, relY) ->
             Box(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(0.08f)
-                        .absoluteOffset(
-                            x = (relX * 100).dp,
-                            y = (relY * 100).dp
-                        )
-                        .background(awayTeamColor.copy(alpha = 0.6f), CircleShape)
-                        .border(1.5.dp, awayTeamColor, CircleShape)
-                )
-            }
+                modifier = Modifier
+                    .offset(
+                        x = fieldWidth * relX - tokenSize / 2,
+                        y = fieldHeight * relY - tokenSize / 2,
+                    )
+                    .size(tokenSize)
+                    .background(awayTeamColor.copy(alpha = 0.65f), CircleShape)
+                    .border(1.5.dp, awayTeamColor, CircleShape)
+            )
         }
-        
-        // Pelota animada con glow
+
         AnimatedBall(
             ballZone = ballZone,
-            modifier = Modifier.fillMaxSize()
+            fieldWidth = fieldWidth,
+            fieldHeight = fieldHeight,
         )
     }
 }
@@ -808,10 +1022,11 @@ private fun LivePitchView(
 @Composable
 private fun AnimatedBall(
     ballZone: Int,
-    modifier: Modifier = Modifier,
+    fieldWidth: Dp,
+    fieldHeight: Dp,
 ) {
     val ballSize = 10.dp
-    
+
     // Posición objetivo según zona
     val targetOffset = remember(ballZone) {
         when (ballZone) {
@@ -822,39 +1037,37 @@ private fun AnimatedBall(
             else -> Offset(0.5f, 0.9f) // portería propia (abajo)
         }
     }
-    
+
     // Animación de posición con spring
     val animatedOffset by animateOffsetAsState(
         targetValue = targetOffset,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 80f),
         label = "ballPosition"
     )
-    
-    Box(modifier = modifier) {
-        Canvas(
-            modifier = Modifier
-                .size(ballSize)
-                .absoluteOffset(
-                    x = (animatedOffset.x * 100).dp - (ballSize / 2),
-                    y = (animatedOffset.y * 100).dp - (ballSize / 2)
-                )
-        ) {
-            // Glow exterior (más transparente, más grande)
-            drawCircle(
-                color = DosYellow.copy(alpha = 0.3f),
-                radius = size.width * 0.8f
+
+    Canvas(
+        modifier = Modifier
+            .size(ballSize)
+            .offset(
+                x = fieldWidth * animatedOffset.x - (ballSize / 2),
+                y = fieldHeight * animatedOffset.y - (ballSize / 2),
             )
-            // Glow intermedio
-            drawCircle(
-                color = DosYellow.copy(alpha = 0.5f),
-                radius = size.width * 0.5f
-            )
-            // Pelota sólida
-            drawCircle(
-                color = DosYellow,
-                radius = size.width * 0.3f
-            )
-        }
+    ) {
+        // Glow exterior (más transparente, más grande)
+        drawCircle(
+            color = DosYellow.copy(alpha = 0.3f),
+            radius = size.width * 0.8f
+        )
+        // Glow intermedio
+        drawCircle(
+            color = DosYellow.copy(alpha = 0.5f),
+            radius = size.width * 0.5f
+        )
+        // Pelota sólida
+        drawCircle(
+            color = DosYellow,
+            radius = size.width * 0.3f
+        )
     }
 }
 
@@ -896,6 +1109,32 @@ private fun EventRow(
                 contentDescription = null,
                 tint = DosCyan,
                 modifier = Modifier.size(16.dp)
+            )
+            EventType.INJURY -> Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(DosRed.copy(alpha = 0.7f), CircleShape)
+            )
+            EventType.VAR -> Text(
+                text = "VAR",
+                color = DosYellow,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 9.sp,
+            )
+            EventType.TIME_WASTING -> Text(
+                text = "PT",
+                color = DosCyan,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+            )
+            EventType.NARRATION -> Text(
+                text = "N",
+                color = DosGray,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
             )
             EventType.KICKOFF -> Box(
                 modifier = Modifier

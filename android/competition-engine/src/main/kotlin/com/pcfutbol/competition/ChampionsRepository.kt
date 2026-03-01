@@ -616,6 +616,7 @@ class ChampionsRepository @Inject constructor(
     }
 
     private suspend fun buildTeamInput(teamId: Int, isHome: Boolean): TeamMatchInput {
+        val team = teamDao.byId(teamId)
         val players = playerDao.byTeamNow(teamId)
         val available = players.filter {
             it.status == 0 && it.injuryWeeksLeft <= 0 && it.sanctionMatchesLeft <= 0
@@ -633,9 +634,10 @@ class ChampionsRepository @Inject constructor(
 
         return TeamMatchInput(
             teamId = teamId,
-            teamName = teamDao.byId(teamId)?.nameShort ?: "Equipo $teamId",
+            teamName = team?.nameShort ?: "Equipo $teamId",
             squad = starters.map { it.toSimAttrs() },
             isHome = isHome,
+            competitionCode = team?.competitionKey ?: "",
         )
     }
 

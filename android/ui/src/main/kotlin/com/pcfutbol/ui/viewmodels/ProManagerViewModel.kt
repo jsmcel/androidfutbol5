@@ -2,8 +2,14 @@ package com.pcfutbol.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pcfutbol.core.data.db.CONTROL_MODE_BASIC
+import com.pcfutbol.core.data.db.CONTROL_MODE_STANDARD
+import com.pcfutbol.core.data.db.CONTROL_MODE_TOTAL
 import com.pcfutbol.core.data.db.PROMANAGER_MODE
 import com.pcfutbol.core.data.db.SeasonStateDao
+import com.pcfutbol.core.data.db.controlModeLabel
+import com.pcfutbol.core.data.db.normalizedControlMode
+import com.pcfutbol.core.data.db.withControlMode
 import com.pcfutbol.core.data.db.withManagerMode
 import com.pcfutbol.promanager.OfferPoolGenerator
 import com.pcfutbol.promanager.ProManagerRepository
@@ -35,6 +41,8 @@ data class ProManagerUiState(
     val prestige: Int = 1,
     val totalSeasons: Int = 0,
     val careerHistory: List<String> = emptyList(),
+    val managerControlMode: String = CONTROL_MODE_STANDARD,
+    val managerControlModeLabel: String = "Estandar",
     val error: String? = null,
     val offerAccepted: Boolean = false,
 )
@@ -50,17 +58,45 @@ class ProManagerViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            seasonStateDao.observe().collect { state ->
+                val mode = state?.normalizedControlMode ?: CONTROL_MODE_STANDARD
+                _uiState.value = _uiState.value.copy(
+                    managerControlMode = mode,
+                    managerControlModeLabel = controlModeLabel(mode),
+                )
+            }
+        }
+        viewModelScope.launch {
             repo.allManagers().collect { managers ->
+                val current = _uiState.value
                 if (managers.isEmpty()) {
-                    _uiState.value = ProManagerUiState(noManager = true)
+                    _uiState.value = ProManagerUiState(
+                        noManager = true,
+                        managerControlMode = current.managerControlMode,
+                        managerControlModeLabel = current.managerControlModeLabel,
+                    )
                 } else {
                     _uiState.value = ProManagerUiState(
                         noManager    = false,
                         pendingLogin = true,
                         managerNames = managers.map { it.name },
+                        managerControlMode = current.managerControlMode,
+                        managerControlModeLabel = current.managerControlModeLabel,
                     )
                 }
             }
+        }
+    }
+
+    fun cycleControlMode() {
+        viewModelScope.launch {
+            val state = seasonStateDao.get() ?: return@launch
+            val next = when (state.normalizedControlMode) {
+                CONTROL_MODE_BASIC -> CONTROL_MODE_STANDARD
+                CONTROL_MODE_STANDARD -> CONTROL_MODE_TOTAL
+                else -> CONTROL_MODE_BASIC
+            }
+            seasonStateDao.update(state.withControlMode(next))
         }
     }
 
@@ -83,6 +119,7 @@ class ProManagerViewModel @Inject constructor(
     }
 
     private suspend fun loadOffers(managerId: Int, managerName: String) {
+        val current = _uiState.value
         val offers = repo.generateOffers(managerId).map { it.toUiItem() }
         val profile = repo.managerById(managerId)
         _uiState.value = ProManagerUiState(
@@ -94,6 +131,8 @@ class ProManagerViewModel @Inject constructor(
             prestige = profile?.prestige ?: 1,
             totalSeasons = profile?.totalSeasons ?: 0,
             careerHistory = parseCareerHistory(profile?.careerHistoryJson.orEmpty()),
+            managerControlMode = current.managerControlMode,
+            managerControlModeLabel = current.managerControlModeLabel,
         )
     }
 

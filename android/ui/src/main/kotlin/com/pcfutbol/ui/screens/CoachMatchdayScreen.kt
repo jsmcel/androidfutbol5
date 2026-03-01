@@ -72,6 +72,10 @@ import org.json.JSONArray
 import kotlin.math.abs
 import kotlin.math.max
 
+private const val HUMAN_MATCH_TICK_MS = 3_500L
+private const val HUMAN_MAX_EVENT_GAP_MS = 10_500L
+private const val HUMAN_SAME_MINUTE_EVENT_GAP_MS = 420L
+
 @Composable
 fun CoachMatchdayScreen(
     matchday: Int,
@@ -137,8 +141,13 @@ fun CoachMatchdayScreen(
         var previousMinute = 1
         selectedEvents.sortedBy { it.minute }.forEach { event ->
             val minute = event.minute.coerceAtLeast(1)
-            val minuteDelta = (minute - previousMinute).coerceAtLeast(1)
-            delay((70L + minuteDelta * 9L).coerceAtMost(260L))
+            val minuteDelta = (minute - previousMinute).coerceAtLeast(0)
+            val delayMs = if (minuteDelta == 0) {
+                HUMAN_SAME_MINUTE_EVENT_GAP_MS
+            } else {
+                (minuteDelta * HUMAN_MATCH_TICK_MS).coerceAtMost(HUMAN_MAX_EVENT_GAP_MS)
+            }
+            delay(delayMs)
             replayEvents += event
             liveMinute = minute
             if (event.type == "GOAL") {
@@ -172,7 +181,7 @@ fun CoachMatchdayScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = DosCyan)
                 }
                 Text(
-                    text = "MODO ENTRENADOR - J$matchday",
+                    text = "PARTIDO - J$matchday (${state.managerControlModeLabel})",
                     color = DosYellow,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
@@ -184,8 +193,11 @@ fun CoachMatchdayScreen(
                 text = if (pending) "SIMULAR" else "REPETIR",
                 onClick = {
                     if (pending) {
-                        vm.setCoachCommand(command)
-                        vm.simulateMatchday(matchday, System.currentTimeMillis(), command)
+                        if (state.coachCommandsEnabled) {
+                            vm.setCoachCommand(command)
+                        }
+                        val cmd = if (state.coachCommandsEnabled) command else CoachCommand.BALANCED
+                        vm.simulateMatchday(matchday, System.currentTimeMillis(), cmd)
                     } else {
                         replayNonce += 1
                     }
@@ -197,13 +209,24 @@ fun CoachMatchdayScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        CoachCommandBar(
-            selected = command,
-            onSelect = {
-                command = it
-                vm.setCoachCommand(it)
-            },
-        )
+        if (state.coachCommandsEnabled) {
+            CoachCommandBar(
+                selected = command,
+                onSelect = {
+                    command = it
+                    vm.setCoachCommand(it)
+                },
+            )
+        } else {
+            Text(
+                text = "Modo Basico: simulacion automatica sin comandos de banquillo",
+                color = DosGray,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -525,12 +548,15 @@ private fun EventLine(event: CoachEventUi, isHome: Boolean) {
     val typeColor = when (event.type) {
         "GOAL" -> DosYellow
         "OWN_GOAL" -> DosYellow
+        "VAR_REVIEW" -> DosCyan
         "VAR_DISALLOWED" -> DosRed
         "TIME_WASTING" -> DosGray
         "RED_CARD" -> DosRed
         "YELLOW_CARD" -> DosYellow
         "INJURY" -> DosRed
         "SUBSTITUTION" -> DosCyan
+        "TACTICAL_STOP" -> DosCyan
+        "NARRATION" -> DosLightGray
         else -> DosLightGray
     }
     Row(
@@ -598,9 +624,11 @@ private fun ballPositionForEvent(event: CoachEventUi, homeTeamId: Int): CoachBal
     val homeSide = event.teamId == homeTeamId
     val y = when (event.type) {
         "GOAL", "OWN_GOAL" -> if (homeSide) 0.12f else 0.88f
-        "VAR_DISALLOWED" -> if (homeSide) 0.20f else 0.80f
+        "VAR_REVIEW", "VAR_DISALLOWED" -> if (homeSide) 0.20f else 0.80f
         "YELLOW_CARD", "RED_CARD", "INJURY", "TIME_WASTING" -> if (homeSide) 0.34f else 0.66f
         "SUBSTITUTION" -> if (homeSide) 0.94f else 0.06f
+        "TACTICAL_STOP" -> if (homeSide) 0.58f else 0.42f
+        "NARRATION" -> if (event.teamId <= 0) 0.50f else if (homeSide) 0.44f else 0.56f
         else -> if (homeSide) 0.44f else 0.56f
     }
     val seed = abs(event.minute * 97 + event.teamId * 13 + event.type.hashCode())

@@ -48,11 +48,22 @@ data class TeamMatchInput(
     val squad: List<PlayerSimAttrs>,  // los 11 titulares
     val tactic: TacticParams = TacticParams(),
     val isHome: Boolean,
+    val competitionCode: String = "",
 )
 
 /** Tipo de evento en el partido */
 enum class EventType {
-    GOAL, OWN_GOAL, YELLOW_CARD, RED_CARD, SUBSTITUTION, INJURY, VAR_DISALLOWED, TIME_WASTING
+    GOAL,
+    OWN_GOAL,
+    YELLOW_CARD,
+    RED_CARD,
+    SUBSTITUTION,
+    INJURY,
+    VAR_REVIEW,
+    VAR_DISALLOWED,
+    TIME_WASTING,
+    TACTICAL_STOP,
+    NARRATION,
 }
 
 /** Evento de partido */

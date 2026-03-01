@@ -112,6 +112,7 @@ class CompetitionRepository @Inject constructor(
             managerTeamId = managerTeamId,
             managerFixture = managerFixturePlayed,
             managerResult = managerResult,
+            updatedStandings = updatedStandings,
         )
 
         // Avanzar matchday en SeasonState y gestionar ventana de mercado
@@ -251,6 +252,7 @@ class CompetitionRepository @Inject constructor(
     }
 
     private suspend fun buildTeamInput(teamId: Int, isHome: Boolean): TeamMatchInput {
+        val team = teamDao.byId(teamId)
         val players = playerDao.byTeamNow(teamId)
         val available = players.filter {
             it.status == 0 && it.injuryWeeksLeft <= 0 && it.sanctionMatchesLeft <= 0
@@ -268,10 +270,11 @@ class CompetitionRepository @Inject constructor(
         val tactic = resolveTeamTactic(teamId)
         return TeamMatchInput(
             teamId   = teamId,
-            teamName = teamDao.byId(teamId)?.nameShort ?: "Equipo $teamId",
+            teamName = team?.nameShort ?: "Equipo $teamId",
             squad    = starters.map { it.toSimAttrs() },
             tactic   = tactic,
             isHome   = isHome,
+            competitionCode = team?.competitionKey ?: "",
         )
     }
 
@@ -370,8 +373,10 @@ class CompetitionRepository @Inject constructor(
         managerTeamId: Int,
         managerFixture: FixtureEntity?,
         managerResult: MatchResult?,
+        updatedStandings: List<StandingEntity>,
     ) {
         if (managerTeamId <= 0 || managerFixture == null || managerResult == null) return
+        val seasonState = seasonStateDao.get() ?: return
         val team = teamDao.byId(managerTeamId) ?: return
         val squad = playerDao.byTeamNow(managerTeamId)
         val wagesCostK = squad.sumOf { it.wageK }.coerceAtLeast(500)
@@ -391,8 +396,53 @@ class CompetitionRepository @Inject constructor(
         }
 
         val netK = sponsorIncomeK + attendanceIncomeK + resultBonusK - wagesCostK
-        val newBudget = (team.budgetK + netK).coerceAtLeast(0)
-        teamDao.update(team.copy(budgetK = newBudget))
+        var newBudgetK = (team.budgetK + netK).coerceAtLeast(0)
+        var presidentEvents: List<String> = emptyList()
+
+        if (allowsPresidentDesk(seasonState.normalizedControlMode)) {
+            val managerStanding = updatedStandings.firstOrNull { it.teamId == managerTeamId }
+            val managerPosition = managerStanding?.position?.takeIf { it > 0 } ?: (updatedStandings.size + 1)
+            val totalTeams = updatedStandings.size.coerceAtLeast(1)
+            val relegationSlots = competitionDao.byCode(managerFixture.competitionCode)
+                ?.relegationSlots
+                ?.coerceAtLeast(1)
+                ?: 3
+
+            val isHomeManager = managerFixture.homeTeamId == managerTeamId
+            val managerGoals = if (isHomeManager) managerResult.homeGoals else managerResult.awayGoals
+            val rivalGoals = if (isHomeManager) managerResult.awayGoals else managerResult.homeGoals
+            val goalDiff = managerGoals - rivalGoals
+
+            val presidentUpdate = applyPresidentWeeklyEffects(
+                state = seasonState,
+                teamId = managerTeamId,
+                matchday = matchday,
+                wageBillK = wagesCostK,
+                budgetK = newBudgetK,
+                managerGoalDiff = goalDiff,
+                managerPosition = managerPosition,
+                totalTeams = totalTeams,
+                relegationSlots = relegationSlots,
+            )
+            seasonStateDao.update(presidentUpdate.state)
+            newBudgetK = presidentUpdate.budgetK
+            presidentEvents = presidentUpdate.events
+
+            if (presidentEvents.isNotEmpty()) {
+                newsDao.insert(
+                    NewsEntity(
+                        date = java.time.LocalDate.now().toString(),
+                        matchday = matchday,
+                        category = "PRESIDENT",
+                        titleEs = "Despacho del presidente (J$matchday)",
+                        bodyEs = presidentEvents.joinToString(" "),
+                        teamId = managerTeamId,
+                    )
+                )
+            }
+        }
+
+        teamDao.update(team.copy(budgetK = newBudgetK))
 
         newsDao.insert(
             NewsEntity(
@@ -400,9 +450,167 @@ class CompetitionRepository @Inject constructor(
                 matchday = matchday,
                 category = "FINANCE",
                 titleEs = "Caja semanal ${if (netK >= 0) "+" else ""}${netK}K",
-                bodyEs = "Sponsor ${sponsorIncomeK}K + taquilla ${attendanceIncomeK}K + bonus ${resultBonusK}K - salarios ${wagesCostK}K.",
+                bodyEs = buildString {
+                    append("Sponsor ${sponsorIncomeK}K + taquilla ${attendanceIncomeK}K + bonus ${resultBonusK}K - salarios ${wagesCostK}K.")
+                    if (presidentEvents.isNotEmpty()) {
+                        append(" Junta: ")
+                        append(presidentEvents.joinToString(" "))
+                    }
+                },
                 teamId = managerTeamId,
             )
+        )
+    }
+
+    private data class PresidentWeeklyUpdate(
+        val budgetK: Int,
+        val state: SeasonStateEntity,
+        val events: List<String>,
+    )
+
+    private suspend fun applyPresidentWeeklyEffects(
+        state: SeasonStateEntity,
+        teamId: Int,
+        matchday: Int,
+        wageBillK: Int,
+        budgetK: Int,
+        managerGoalDiff: Int,
+        managerPosition: Int,
+        totalTeams: Int,
+        relegationSlots: Int,
+    ): PresidentWeeklyUpdate {
+        val rngSeed = state.season.hashCode().toLong() xor
+            (matchday.toLong() * 65537L) xor
+            (teamId.toLong() * 131L) xor
+            0x50EL
+        val rng = kotlin.random.Random(rngSeed)
+
+        var pressure = state.presidentPressure.coerceIn(0, 12)
+        var ownership = state.normalizedPresidentOwnership
+        var capMode = state.normalizedPresidentSalaryCapMode
+        var capK = state.presidentSalaryCapK.coerceAtLeast(0)
+        var nextReview = state.presidentNextReviewMatchday.coerceAtLeast(1)
+        var lastReview = state.presidentLastReviewMatchday.coerceAtLeast(0)
+        var lastCapPenalty = state.presidentLastCapPenaltyMatchday
+        var budget = budgetK.coerceAtLeast(0)
+        val events = mutableListOf<String>()
+
+        if (capK <= 0) {
+            val factor = presidentSalaryCapFactor(capMode)
+            capK = maxOf((wageBillK * factor).toInt(), wageBillK + 1)
+        } else {
+            capK = maxOf(capK, wageBillK + 1)
+        }
+
+        pressure += when {
+            managerGoalDiff >= 2 -> -1
+            managerGoalDiff <= -2 -> 2
+            managerGoalDiff == -1 -> 1
+            else -> 0
+        }
+        if (managerPosition > totalTeams - relegationSlots) {
+            pressure += 1
+        } else if (managerPosition <= maxOf(3, totalTeams / 4)) {
+            pressure -= 1
+        }
+        pressure = pressure.coerceIn(0, 12)
+
+        val capCrisis = wageBillK > capK
+        val relegationAlert = managerPosition > totalTeams - relegationSlots && matchday >= maxOf(7, totalTeams / 4)
+        val highPressure = pressure >= 9
+        val reviewDue = matchday >= maxOf(1, nextReview)
+        val reviewNow = reviewDue || capCrisis || relegationAlert || highPressure
+
+        if (reviewNow) {
+            when (ownership) {
+                PRESIDENT_OWNERSHIP_PRIVATE -> {
+                    if (pressure >= 8 && rng.nextDouble() < 0.35) {
+                        val injection = rng.nextInt(2_000, 5_001)
+                        budget += injection
+                        pressure = (pressure - 1).coerceAtLeast(0)
+                        events += "Consejo privado aprueba ampliacion de caja (+${injection}K)."
+                    } else if (pressure <= 2 && rng.nextDouble() < 0.22) {
+                        val payout = rng.nextInt(800, 2_201)
+                        budget = (budget - payout).coerceAtLeast(0)
+                        events += "Consejo privado extrae dividendos (${payout}K)."
+                    }
+                }
+
+                PRESIDENT_OWNERSHIP_STATE -> {
+                    if ((matchday % 6 == 0 && rng.nextDouble() < 0.70) || rng.nextDouble() < 0.20) {
+                        val injection = rng.nextInt(1_800, 4_501)
+                        budget += injection
+                        capK = maxOf((capK * 1.01).toInt(), wageBillK + 1)
+                        events += "Aportacion institucional extraordinaria (+${injection}K)."
+                    }
+                }
+
+                PRESIDENT_OWNERSHIP_LISTED -> {
+                    if (managerGoalDiff > 0 && rng.nextDouble() < 0.65) {
+                        val delta = rng.nextInt(300, 1_201)
+                        budget += delta
+                        events += "La cotizacion sube tras la victoria (+${delta}K)."
+                    } else if (managerGoalDiff < 0 && rng.nextDouble() < 0.70) {
+                        val delta = rng.nextInt(300, 1_401)
+                        budget = (budget - delta).coerceAtLeast(0)
+                        events += "La cotizacion cae tras la derrota (${delta}K)."
+                    }
+                }
+            }
+        }
+
+        if (capCrisis && (matchday - lastCapPenalty >= 4 || reviewNow)) {
+            val overflowK = (wageBillK - capK).coerceAtLeast(0)
+            val penalty = minOf(
+                overflowK * 18,
+                maxOf(500, (budget * 12) / 100),
+            )
+            budget = (budget - penalty).coerceAtLeast(0)
+            pressure = (pressure + 2).coerceAtMost(12)
+            lastCapPenalty = matchday
+            events += "Incumplimiento de tope salarial: multa financiera (${penalty}K)."
+        } else if (capCrisis) {
+            pressure = (pressure + 1).coerceAtMost(12)
+        }
+
+        if (pressure >= 9 && capMode != PRESIDENT_CAP_STRICT && reviewNow) {
+            capMode = PRESIDENT_CAP_STRICT
+            capK = maxOf((wageBillK * presidentSalaryCapFactor(capMode)).toInt(), wageBillK + 1)
+            events += "La junta impone tope salarial estricto por alta presion."
+        } else if (pressure <= 2 && capMode == PRESIDENT_CAP_STRICT && reviewNow && matchday >= 8) {
+            capMode = PRESIDENT_CAP_BALANCED
+            capK = maxOf((wageBillK * presidentSalaryCapFactor(capMode)).toInt(), wageBillK + 1)
+            events += "La junta relaja el tope salarial a modo equilibrado."
+        }
+
+        if (reviewNow) {
+            lastReview = matchday
+            val minGap = if (pressure >= 8) 2 else 3
+            val maxGap = if (pressure >= 8) 4 else 6
+            nextReview = matchday + rng.nextInt(minGap, maxGap + 1)
+        } else {
+            nextReview = maxOf(nextReview, matchday + 1)
+        }
+
+        ownership = when (ownership) {
+            PRESIDENT_OWNERSHIP_PRIVATE,
+            PRESIDENT_OWNERSHIP_STATE,
+            PRESIDENT_OWNERSHIP_LISTED -> ownership
+            else -> PRESIDENT_OWNERSHIP_SOCIOS
+        }
+
+        return PresidentWeeklyUpdate(
+            budgetK = budget.coerceAtLeast(0),
+            state = state.copy(
+                presidentOwnership = ownership,
+                presidentSalaryCapMode = capMode,
+                presidentSalaryCapK = maxOf(capK, wageBillK + 1),
+                presidentPressure = pressure.coerceIn(0, 12),
+                presidentLastReviewMatchday = lastReview,
+                presidentNextReviewMatchday = nextReview.coerceAtLeast(matchday + 1),
+                presidentLastCapPenaltyMatchday = lastCapPenalty,
+            ),
+            events = events,
         )
     }
 

@@ -20,7 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -93,30 +93,41 @@ fun TransferMarketScreen(
             Spacer(Modifier.width(48.dp))
         }
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (state.windowOpen) DosGreen.copy(alpha = 0.2f) else DosRed.copy(alpha = 0.15f))
                 .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "[ ${state.windowName.uppercase()} ]",
-                color = if (state.windowOpen) DosGreen else DosRed,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-            )
-            val budgetStr = when {
-                state.budgetK >= 1_000_000 -> "${"%.1f".format(state.budgetK / 1_000_000.0)}M€"
-                state.budgetK >= 1_000 -> "${"%.0f".format(state.budgetK / 1_000.0)}K€"
-                else -> "${state.budgetK}K€"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "[ ${state.windowName.uppercase()} ]",
+                    color = if (state.windowOpen) DosGreen else DosRed,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "PRESUPUESTO: ${formatKAmount(state.budgetK)}",
+                    color = DosGreen,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                )
             }
+            Spacer(Modifier.height(2.dp))
+            val marginColor = if (state.salaryCapMarginK >= 0) DosCyan else DosRed
             Text(
-                text = "PRESUPUESTO: $budgetStr",
-                color = DosGreen,
-                fontSize = 11.sp,
+                text = "TOPE ${state.salaryCapModeLabel.uppercase()}: ${formatKAmount(state.salaryCapK)}  " +
+                    "|  MASA ${formatKAmount(state.wageBillK)}  " +
+                    "|  MARGEN ${if (state.salaryCapMarginK >= 0) "+" else "-"}" +
+                    formatKAmount(kotlin.math.abs(state.salaryCapMarginK)),
+                color = marginColor,
+                fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
             )
@@ -181,7 +192,7 @@ fun TransferMarketScreen(
                 Text("No hay jugadores con estos filtros.", color = DosGray, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             } else {
                 HeaderForTab(state.tab)
-                Divider(color = DosGray.copy(alpha = 0.3f))
+                HorizontalDivider(color = DosGray.copy(alpha = 0.3f))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     items(players) { player ->
                         val team = vm.originTeamName(player)
@@ -283,6 +294,12 @@ private fun panelTitle(tab: MarketTab, size: Int): String = when (tab) {
     MarketTab.FREE_AGENTS -> "AGENTES LIBRES ($size)"
     MarketTab.CLUB_PLAYERS -> "JUGADORES EN CLUBES ($size)"
     MarketTab.MY_SQUAD -> "TU PLANTILLA EN MERCADO ($size)"
+}
+
+private fun formatKAmount(valueK: Int): String = when {
+    valueK >= 1_000_000 -> "${"%.2f".format(valueK / 1_000_000.0)}B€"
+    valueK >= 1_000 -> "${"%.1f".format(valueK / 1_000.0)}M€"
+    else -> "${valueK}K€"
 }
 
 @Composable

@@ -16,8 +16,10 @@ OUTPUT_DIR = ROOT / "cli" / "qa_outputs"
 INPUT_LINES = [
     "6",         # main menu -> ProManager
     "CODEX_QA",  # new manager name
+    "2",         # control mode -> STANDARD
     "1",         # first offer
     "5",         # simulate rest of season
+    "2",         # end of season -> back to main menu
     "0",         # back at main menu -> exit
 ]
 INPUTS = "\n".join(INPUT_LINES) + "\n"

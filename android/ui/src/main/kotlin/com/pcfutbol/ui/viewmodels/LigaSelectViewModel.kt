@@ -4,10 +4,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pcfutbol.core.data.db.CompetitionDao
 import com.pcfutbol.core.data.db.MANAGER_MODE
+import com.pcfutbol.core.data.db.CONTROL_MODE_BASIC
+import com.pcfutbol.core.data.db.CONTROL_MODE_STANDARD
+import com.pcfutbol.core.data.db.CONTROL_MODE_TOTAL
 import com.pcfutbol.core.data.db.SeasonStateDao
 import com.pcfutbol.core.data.db.TeamDao
 import com.pcfutbol.core.data.db.TeamEntity
+import com.pcfutbol.core.data.db.allowsCoachMode
+import com.pcfutbol.core.data.db.allowsManagerDepth
+import com.pcfutbol.core.data.db.allowsPresidentDesk
+import com.pcfutbol.core.data.db.controlModeLabel
 import com.pcfutbol.core.data.db.managerLeague
+import com.pcfutbol.core.data.db.normalizedControlMode
+import com.pcfutbol.core.data.db.withControlMode
 import com.pcfutbol.core.data.db.withManagerLeague
 import com.pcfutbol.core.data.db.withManagerMode
 import com.pcfutbol.core.data.seed.CompetitionDefinitions
@@ -44,6 +53,11 @@ data class LigaSelectUiState(
     val phase: String = "SEASON",
     val transferWindowOpen: Boolean = false,
     val teamsForLeague: List<TeamEntity> = emptyList(),
+    val managerControlMode: String = CONTROL_MODE_STANDARD,
+    val managerControlModeLabel: String = "Estandar",
+    val coachModeEnabled: Boolean = true,
+    val managerDepthEnabled: Boolean = true,
+    val presidentDeskEnabled: Boolean = false,
 )
 
 @HiltViewModel
@@ -88,6 +102,18 @@ class LigaSelectViewModel @Inject constructor(
         }
     }
 
+    fun cycleControlMode() {
+        viewModelScope.launch {
+            val state = seasonStateDao.get() ?: return@launch
+            val next = when (state.normalizedControlMode) {
+                CONTROL_MODE_BASIC -> CONTROL_MODE_STANDARD
+                CONTROL_MODE_STANDARD -> CONTROL_MODE_TOTAL
+                else -> CONTROL_MODE_BASIC
+            }
+            seasonStateDao.update(state.withControlMode(next))
+        }
+    }
+
     // ------------------------------------------------------------------
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -114,6 +140,7 @@ class LigaSelectViewModel @Inject constructor(
                     ?.competitionKey
                     ?.takeIf { it.isNotBlank() }
                     ?: ss.managerLeague
+                val controlMode = ss.normalizedControlMode
                 _uiState.value = _uiState.value.copy(
                     currentMatchday = ss.currentMatchday.coerceAtLeast(1),
                     managerTeamId = ss.managerTeamId,
@@ -122,6 +149,11 @@ class LigaSelectViewModel @Inject constructor(
                     selectedLeague = selectedLeague,
                     phase = ss.phase,
                     transferWindowOpen = ss.transferWindowOpen,
+                    managerControlMode = controlMode,
+                    managerControlModeLabel = controlModeLabel(controlMode),
+                    coachModeEnabled = allowsCoachMode(controlMode),
+                    managerDepthEnabled = allowsManagerDepth(controlMode),
+                    presidentDeskEnabled = allowsPresidentDesk(controlMode),
                 )
             }
         }

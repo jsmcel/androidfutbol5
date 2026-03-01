@@ -64,6 +64,24 @@ fun ProManagerOffersScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        DosButton(
+            text = "NIVEL CONTROL: ${uiState.managerControlModeLabel}",
+            onClick = vm::cycleControlMode,
+            modifier = Modifier.fillMaxWidth(),
+            color = if (uiState.managerControlMode == "TOTAL") DosGreen else DosCyan,
+        )
+        if (uiState.managerControlMode == "BASIC") {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Modo Basico: sin ordenes de entrenador en partido.",
+                color = DosGray,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
         when {
             uiState.noManager -> {
                 // Crear nuevo manager

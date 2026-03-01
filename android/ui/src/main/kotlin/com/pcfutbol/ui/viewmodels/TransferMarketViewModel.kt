@@ -31,6 +31,10 @@ data class MarketUiState(
     val loading: Boolean = true,
     val managerTeamId: Int = -1,
     val budgetK: Int = 0,
+    val wageBillK: Int = 0,
+    val salaryCapK: Int = 0,
+    val salaryCapMarginK: Int = 0,
+    val salaryCapModeLabel: String = "Equilibrado",
 )
 
 @HiltViewModel
@@ -119,12 +123,24 @@ class TransferMarketViewModel @Inject constructor(
     private suspend fun refreshPools() {
         val managerTeamId = _state.value.managerTeamId
         if (managerTeamId <= 0) {
-            _state.update { it.copy(freeAgents = emptyList(), clubPlayers = emptyList(), squadPlayers = emptyList(), loading = false) }
+            _state.update {
+                it.copy(
+                    freeAgents = emptyList(),
+                    clubPlayers = emptyList(),
+                    squadPlayers = emptyList(),
+                    wageBillK = 0,
+                    salaryCapK = 0,
+                    salaryCapMarginK = 0,
+                    salaryCapModeLabel = "Equilibrado",
+                    loading = false,
+                )
+            }
             return
         }
         val freeAgents = repo.freeAgentsNow()
         val clubPlayers = repo.transferTargetsNow(managerTeamId)
         val squad = repo.squadNow(managerTeamId)
+        val capSnapshot = repo.managerSalaryCapSnapshot(managerTeamId)
         val teamIds = (clubPlayers.mapNotNull { it.teamSlotId } + squad.mapNotNull { it.teamSlotId }).toSet().toList()
         val teamNames = if (teamIds.isEmpty()) {
             emptyMap()
@@ -139,6 +155,10 @@ class TransferMarketViewModel @Inject constructor(
                 squadPlayers = squad,
                 teamNamesById = teamNames,
                 budgetK = budget,
+                wageBillK = capSnapshot.wageBillK,
+                salaryCapK = capSnapshot.salaryCapK,
+                salaryCapMarginK = capSnapshot.marginK,
+                salaryCapModeLabel = capSnapshot.modeLabel,
                 loading = false,
             )
         }

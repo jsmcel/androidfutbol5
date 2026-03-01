@@ -384,8 +384,10 @@ def _calc_team_strength_android(team: Team, tactic: Optional[dict], is_home: boo
 
 def _strength_to_lambda(strength: float, is_home: bool) -> float:
     norm = (strength - 10.0) / 89.0
-    lam = 0.4 + norm * 2.6
-    return lam * 1.12 if is_home else lam
+    # Calibracion realista (5 ultimas temporadas principales):
+    # objetivo global ~2.4-2.9 goles por partido.
+    lam = 0.29 + norm * 1.78
+    return lam * 1.08 if is_home else lam
 
 
 def _apply_expulsion_penalty(lam: float, red_cards: int) -> float:
@@ -404,6 +406,25 @@ def _pace_factors(home_tactic: Optional[dict], away_tactic: Optional[dict]) -> t
     if away_waste:
         return 0.92, 0.88
     return 1.0, 1.0
+
+
+_GOAL_FACTOR_BY_COMP: dict[str, float] = {
+    # Calibrado sobre medias recientes de ligas reales (5 temporadas).
+    "ES1": 0.93,
+    "ES2": 0.81,
+    "GB1": 1.08,
+    "IT1": 1.02,
+    "L1": 1.15,
+    "FR1": 1.02,
+    "NL1": 1.12,
+    "PO1": 0.96,
+    "BE1": 1.08,
+    "TR1": 1.04,
+}
+
+
+def _competition_goal_factor(comp_code: str) -> float:
+    return _GOAL_FACTOR_BY_COMP.get(str(comp_code), 1.0)
 
 
 def _pick_eligible_slot(lineup_size: int, dismissed: set[int], rng: KotlinXorWowRandom) -> Optional[int]:
@@ -479,7 +500,7 @@ def _poisson_goals(lam: float, rng: KotlinXorWowRandom) -> int:
         k += 1
         p *= rng.next_double()
         if p <= L:
-            return max(0, min(9, k - 1))
+            return max(0, min(8, k - 1))
 
 
 def _tactic_adj(tactic: Optional[dict], is_home: bool) -> float:
@@ -526,10 +547,17 @@ def simulate_match(home: Team, away: Team, seed: int,
     home_lineup = _match_squad(home)
     away_lineup = _match_squad(away)
     home_red, away_red = _discipline_red_cards(home_lineup, away_lineup, home_t, away_t, rng)
+    comp_factor = (_competition_goal_factor(home.comp) + _competition_goal_factor(away.comp)) * 0.5
 
     home_pace, away_pace = _pace_factors(home_t, away_t)
-    home_lambda = max(0.1, _apply_expulsion_penalty(_strength_to_lambda(home_strength, True), home_red) * home_pace)
-    away_lambda = max(0.1, _apply_expulsion_penalty(_strength_to_lambda(away_strength, False), away_red) * away_pace)
+    home_lambda = max(
+        0.1,
+        _apply_expulsion_penalty(_strength_to_lambda(home_strength, True), home_red) * home_pace * comp_factor,
+    )
+    away_lambda = max(
+        0.1,
+        _apply_expulsion_penalty(_strength_to_lambda(away_strength, False), away_red) * away_pace * comp_factor,
+    )
 
     home_raw = _poisson_goals(home_lambda, rng)
     away_raw = _poisson_goals(away_lambda, rng)
@@ -1022,6 +1050,24 @@ STAFF_LABELS = {
     "cuidador": "Cuidador",
 }
 
+MANAGER_PLAY_MODE_LABELS = {
+    "BASIC": "Basico",
+    "STANDARD": "Estandar",
+    "TOTAL": "Total",
+}
+
+PRESIDENT_CAP_MODES = {
+    "STRICT": 1.05,
+    "BALANCED": 1.20,
+    "FLEX": 1.45,
+}
+
+PRESIDENT_CAP_LABELS = {
+    "STRICT": "Estricto",
+    "BALANCED": "Equilibrado",
+    "FLEX": "Flexible",
+}
+
 
 def _prestige_label(p: int) -> str:
     return "â˜…" * min(p, 5) + "â˜†" * (5 - min(p, 5))
@@ -1037,6 +1083,60 @@ def _safe_int(value, default: int) -> int:
         return int(value)
     except Exception:
         return default
+
+
+def _ensure_manager_play_mode(data: dict) -> str:
+    manager = data.setdefault("manager", {})
+    if not isinstance(manager, dict):
+        manager = {}
+        data["manager"] = manager
+    raw = str(manager.get("play_mode", "STANDARD")).strip().upper()
+    alias = {
+        "BASIC": "BASIC",
+        "BASICO": "BASIC",
+        "STANDARD": "STANDARD",
+        "ESTANDAR": "STANDARD",
+        "TOTAL": "TOTAL",
+    }
+    mode = alias.get(raw, "STANDARD")
+    manager["play_mode"] = mode
+    return mode
+
+
+def _play_mode_label(mode: str) -> str:
+    return MANAGER_PLAY_MODE_LABELS.get(mode, "Estandar")
+
+
+def _play_mode_allows_coach_match(mode: str) -> bool:
+    return mode in ("STANDARD", "TOTAL")
+
+
+def _play_mode_allows_manager_depth(mode: str) -> bool:
+    return mode in ("STANDARD", "TOTAL")
+
+
+def _play_mode_allows_president(mode: str) -> bool:
+    return mode == "TOTAL"
+
+
+def _play_mode_menu(data: dict, persist: bool = True) -> str:
+    current = _ensure_manager_play_mode(data)
+    print(_c(BOLD + YELLOW, "\n  ═══ NIVEL DE CONTROL ═══"))
+    print(_c(GRAY, f"  Actual: {_play_mode_label(current)}"))
+    print()
+    print(_c(CYAN, "  1. Basico    (partidas rapidas, menos gestion manual)"))
+    print(_c(CYAN, "  2. Estandar  (manager clasico, con tactica y staff)"))
+    print(_c(CYAN, "  3. Total     (toda la capa manager/presidencia)"))
+    print(_c(CYAN, "  0. Cancelar"))
+    op = input_int("  Opcion: ", 0, 3)
+    if op == 0:
+        return current
+    next_mode = {1: "BASIC", 2: "STANDARD", 3: "TOTAL"}[op]
+    data.setdefault("manager", {})["play_mode"] = next_mode
+    if persist:
+        _save_career(data)
+    print(_c(GREEN, f"  ✓ Nivel cambiado a {_play_mode_label(next_mode)}.\n"))
+    return next_mode
 
 
 def _ensure_manager_depth(data: dict):
@@ -1068,6 +1168,75 @@ def _ensure_manager_depth(data: dict):
     if focus not in TRAINING_FOCUSES:
         focus = DEFAULT_TRAINING_PLAN["focus"]
     manager["training"] = {"intensity": intensity, "focus": focus}
+    _ensure_manager_play_mode(data)
+
+
+def _estimate_weekly_wage_k(player: "Player") -> int:
+    # Estimacion simple de masa salarial semanal en miles de euros.
+    return max(120, int(player.market_value / 220_000))
+
+
+def _team_wage_bill_k(team: "Team") -> int:
+    return sum(_estimate_weekly_wage_k(p) for p in team.players)
+
+
+def _ensure_president_profile(data: dict, mgr_team: Optional["Team"] = None) -> dict:
+    profile = data.get("president")
+    if not isinstance(profile, dict):
+        profile = {}
+    ownership = str(profile.get("ownership", "SOCIOS")).upper()
+    if ownership not in ("SOCIOS", "PRIVATE", "STATE", "LISTED"):
+        ownership = "SOCIOS"
+    cap_mode = str(profile.get("salary_cap_mode", "BALANCED")).upper()
+    if cap_mode not in PRESIDENT_CAP_MODES:
+        cap_mode = "BALANCED"
+    salary_cap_k = max(0, _safe_int(profile.get("salary_cap_k", 0), 0))
+    pressure = max(0, _safe_int(profile.get("pressure", 0), 0))
+    investor_rounds = max(0, _safe_int(profile.get("investor_rounds", 0), 0))
+    ipo_done = bool(profile.get("ipo_done", False))
+    pelotazo_done = bool(profile.get("pelotazo_done", False))
+    last_review_md = max(0, _safe_int(profile.get("last_review_md", 0), 0))
+    next_review_md = max(1, _safe_int(profile.get("next_review_md", 1), 1))
+    last_cap_penalty_md = _safe_int(profile.get("last_cap_penalty_md", -99), -99)
+
+    if mgr_team is not None:
+        bill_k = _team_wage_bill_k(mgr_team)
+        if salary_cap_k <= 0:
+            salary_cap_k = int(bill_k * PRESIDENT_CAP_MODES[cap_mode])
+        salary_cap_k = max(salary_cap_k, int(bill_k * 1.01))
+
+    normalized = {
+        "ownership": ownership,
+        "salary_cap_mode": cap_mode,
+        "salary_cap_k": salary_cap_k,
+        "pressure": pressure,
+        "investor_rounds": investor_rounds,
+        "ipo_done": ipo_done,
+        "pelotazo_done": pelotazo_done,
+        "last_review_md": last_review_md,
+        "next_review_md": next_review_md,
+        "last_cap_penalty_md": last_cap_penalty_md,
+    }
+    data["president"] = normalized
+    return normalized
+
+
+def _set_salary_cap_mode(data: dict, mgr_team: "Team", mode: str):
+    profile = _ensure_president_profile(data, mgr_team)
+    mode = mode.upper()
+    if mode not in PRESIDENT_CAP_MODES:
+        return
+    bill_k = _team_wage_bill_k(mgr_team)
+    profile["salary_cap_mode"] = mode
+    profile["salary_cap_k"] = max(int(bill_k * PRESIDENT_CAP_MODES[mode]), int(bill_k * 1.01))
+
+
+def _can_register_with_cap(data: dict, mgr_team: "Team", player: "Player") -> tuple[bool, int, int]:
+    profile = _ensure_president_profile(data, mgr_team)
+    cap_k = max(0, _safe_int(profile.get("salary_cap_k", 0), 0))
+    current_k = _team_wage_bill_k(mgr_team)
+    projected_k = current_k + _estimate_weekly_wage_k(player)
+    return projected_k <= cap_k, projected_k, cap_k
 
 
 def _print_career_summary(data: dict):
@@ -1631,13 +1800,28 @@ def _check_objective(objective: str, position: int, total: int, comp: str) -> bo
 
 # ---- PM display helpers ----------------------------------------------------
 
-def _pm_header(data: dict, matchday: int, total_md: int):
+def _pm_header(data: dict, matchday: int, total_md: int, mgr_team: Optional["Team"] = None):
     m = data["manager"]
+    mode = _ensure_manager_play_mode(data)
     print()
     print(_c(BOLD + CYAN, f"  â•â•â• PROMANAGER Â· TEMPORADA {data['season']} â•â•â•"))
     print(_c(YELLOW, f"  Manager : {m['name']:<20}  Prestigio: {_prestige_label(m['prestige'])}"))
     print(_c(YELLOW, f"  Equipo  : {data['team_name']:<20}  Jornada  : {matchday}/{total_md}"))
     print(_c(CYAN,   f"  Objetivo: {data['objective']}"))
+    print(_c(CYAN,   f"  Nivel   : {_play_mode_label(mode)}"))
+    if mgr_team is not None and _play_mode_allows_president(mode):
+        profile = _ensure_president_profile(data, mgr_team)
+        bill_k = _team_wage_bill_k(mgr_team)
+        cap_k = int(profile.get("salary_cap_k", 0))
+        margin_k = cap_k - bill_k
+        margin_c = GREEN if margin_k >= 0 else RED
+        print(
+            _c(
+                GRAY,
+                f"  Presidente: {profile.get('ownership', 'SOCIOS')}  |  Presion {profile.get('pressure', 0)}  |  "
+                f"Tope â‚¬{cap_k:,}K · Masa â‚¬{bill_k:,}K · Margen {_c(margin_c, f'â‚¬{margin_k:+,}K')}",
+            )
+        )
     print()
 
 
@@ -1783,6 +1967,134 @@ def _append_dynamic_news(
     return selected
 
 
+def _president_matchday_effects(
+    data: dict,
+    md: int,
+    mgr_team: Team,
+    my_r: Optional[dict],
+    mgr_pos: int,
+    total: int,
+    n_rel: int,
+    news: list[str],
+) -> list[str]:
+    profile = _ensure_president_profile(data, mgr_team)
+    rng = random.Random(int(data.get("season_seed", 0)) ^ (md * 65537) ^ mgr_team.slot_id ^ 0x50E)
+
+    pressure = int(profile.get("pressure", 0))
+    ownership = str(profile.get("ownership", "SOCIOS"))
+    budget = int(data.get("budget", 0))
+    last_review_md = int(profile.get("last_review_md", 0))
+    next_review_md = int(profile.get("next_review_md", max(1, md + 1)))
+    last_cap_penalty_md = int(profile.get("last_cap_penalty_md", -99))
+    events: list[str] = []
+
+    # Presion base por resultado/tabla.
+    if my_r:
+        is_home = my_r.get("h") == mgr_team.slot_id
+        mg = int(my_r.get("hg", 0)) if is_home else int(my_r.get("ag", 0))
+        og = int(my_r.get("ag", 0)) if is_home else int(my_r.get("hg", 0))
+        diff = mg - og
+        if diff >= 2:
+            pressure -= 1
+        elif diff == 1:
+            pressure = pressure
+        elif diff == 0:
+            pressure += 0
+        elif diff == -1:
+            pressure += 1
+        else:
+            pressure += 2
+
+    if mgr_pos > total - n_rel:
+        pressure += 1
+    elif mgr_pos <= max(3, total // 4):
+        pressure -= 1
+    pressure = max(0, min(12, pressure))
+
+    bill_k = _team_wage_bill_k(mgr_team)
+    cap_k = int(profile.get("salary_cap_k", 0))
+    cap_crisis = bill_k > cap_k
+    relegation_alert = mgr_pos > total - n_rel and md >= max(7, total // 4)
+    high_pressure = pressure >= 9
+    review_due = md >= max(1, next_review_md)
+    review_now = review_due or cap_crisis or relegation_alert or high_pressure
+
+    # Dinamica economica por propiedad.
+    if review_now:
+        if ownership == "PRIVATE":
+            if pressure >= 8 and rng.random() < 0.35:
+                injection = int(rng.uniform(2_000_000, 5_000_000))
+                budget += injection
+                pressure = max(0, pressure - 1)
+                events.append(f"Consejo privado aprueba ampliacion de caja (+â‚¬{injection:,.0f}).")
+            elif pressure <= 2 and rng.random() < 0.22:
+                payout = int(rng.uniform(800_000, 2_200_000))
+                budget = max(0, budget - payout)
+                events.append(f"Consejo privado extrae dividendos (â‚¬{payout:,.0f}).")
+
+        elif ownership == "STATE":
+            # Aportaciones puntuales, no semanales.
+            if (md % 6 == 0 and rng.random() < 0.70) or rng.random() < 0.20:
+                injection = int(rng.uniform(1_800_000, 4_500_000))
+                budget += injection
+                profile["salary_cap_k"] = int(int(profile.get("salary_cap_k", 0)) * 1.01)
+                events.append(f"Aportacion institucional extraordinaria (+â‚¬{injection:,.0f}).")
+
+        elif ownership == "LISTED":
+            if my_r:
+                is_home = my_r.get("h") == mgr_team.slot_id
+                mg = int(my_r.get("hg", 0)) if is_home else int(my_r.get("ag", 0))
+                og = int(my_r.get("ag", 0)) if is_home else int(my_r.get("hg", 0))
+                diff = mg - og
+                if diff > 0 and rng.random() < 0.65:
+                    delta = int(rng.uniform(300_000, 1_200_000))
+                    budget += delta
+                    events.append(f"La cotizacion sube tras la victoria (+â‚¬{delta:,.0f}).")
+                elif diff < 0 and rng.random() < 0.70:
+                    delta = int(rng.uniform(300_000, 1_400_000))
+                    budget = max(0, budget - delta)
+                    events.append(f"La cotizacion cae tras la derrota (â‚¬{delta:,.0f}).")
+
+    # Control del tope salarial: sancion espaciada para evitar spam semanal.
+    if cap_crisis and (md - last_cap_penalty_md >= 4 or review_now):
+        overflow_k = bill_k - cap_k
+        penalty = min(int(overflow_k * 90), max(500_000, int(budget * 0.12)))
+        budget = max(0, budget - penalty)
+        pressure = min(12, pressure + 2)
+        last_cap_penalty_md = md
+        events.append(
+            f"Incumplimiento de tope salarial: multa de control financiero (â‚¬{penalty:,.0f})."
+        )
+    elif cap_crisis:
+        pressure = min(12, pressure + 1)
+
+    # Junta endurece/relaja disciplina salarial segun presion.
+    current_mode = str(profile.get("salary_cap_mode", "BALANCED"))
+    if pressure >= 9 and current_mode != "STRICT" and review_now:
+        _set_salary_cap_mode(data, mgr_team, "STRICT")
+        events.append("La junta impone tope salarial estricto por alta presion.")
+    elif pressure <= 2 and current_mode == "STRICT" and review_now and md >= 8:
+        _set_salary_cap_mode(data, mgr_team, "BALANCED")
+        events.append("La junta relaja el tope salarial a modo equilibrado.")
+
+    if review_now:
+        profile["last_review_md"] = md
+        # Frecuencia de reunion: cada 3-6 jornadas (mas rapida en crisis).
+        min_gap = 2 if pressure >= 8 else 3
+        max_gap = 4 if pressure >= 8 else 6
+        profile["next_review_md"] = md + rng.randint(min_gap, max_gap)
+    else:
+        profile["last_review_md"] = last_review_md
+        profile["next_review_md"] = max(next_review_md, md + 1)
+
+    profile["pressure"] = pressure
+    profile["last_cap_penalty_md"] = last_cap_penalty_md
+    data["budget"] = budget
+    for e in events:
+        news.append(f"J{md}: {e}")
+    return events
+
+
 def _season_end_screen(data: dict, standings: list[Standing], mgr_slot: int,
                         mgr_team: Team, is_l1: bool, n_rel: int) -> bool:
     comp_name = _comp_name(data.get("competition", "ES1"))
@@ -1809,6 +2121,17 @@ def _season_end_screen(data: dict, standings: list[Standing], mgr_slot: int,
         print(_c(GREEN, "  âœ“  OBJETIVO CUMPLIDO"))
     else:
         print(_c(RED,   "  âœ—  OBJETIVO NO CUMPLIDO"))
+    mode = _ensure_manager_play_mode(data)
+    if _play_mode_allows_president(mode):
+        profile = _ensure_president_profile(data, mgr_team)
+        print(
+            _c(
+                GRAY,
+                f"  Propiedad: {profile.get('ownership', 'SOCIOS')}  |  Presion junta: {profile.get('pressure', 0)}",
+            )
+        )
+    else:
+        print(_c(GRAY, f"  Nivel de control: {_play_mode_label(mode)}"))
 
     rel_teams = [standings[total - n_rel + i].team for i in range(n_rel)]
     if mgr_team in rel_teams:
@@ -1839,6 +2162,10 @@ def _season_end_screen(data: dict, standings: list[Standing], mgr_slot: int,
         "objective": data["objective"],
         "met":       met,
     })
+    # La presion se recalibra en cambio de temporada solo en modo Total.
+    if _play_mode_allows_president(mode):
+        profile = _ensure_president_profile(data, mgr_team)
+        profile["pressure"] = max(0, int(profile.get("pressure", 0)) - (2 if met else 0))
     dev_summary = _apply_season_development(data)
     _print_development_summary(dev_summary)
     data["phase"] = "POSTSEASON"
@@ -1965,32 +2292,149 @@ def _manager_depth_menu(data: dict):
             staff[key] = input_int("  Nuevo nivel (0-100): ", 0, 100)
 
 
+def _president_menu(data: dict, mgr_team: "Team"):
+    profile = _ensure_president_profile(data, mgr_team)
+    rng = random.Random(int(data.get("season_seed", 0)) ^ int(data.get("current_matchday", 1)) ^ 0xC1A5)
+    while True:
+        profile = _ensure_president_profile(data, mgr_team)
+        budget = int(data.get("budget", 0))
+        bill_k = _team_wage_bill_k(mgr_team)
+        cap_k = int(profile.get("salary_cap_k", 0))
+        room_k = cap_k - bill_k
+        room_color = GREEN if room_k >= 0 else RED
+        print(_c(BOLD + YELLOW, "\n  â•â•â• DESPACHO DEL PRESIDENTE â•â•â•"))
+        print(f"  Club: {mgr_team.name}  |  Propiedad: {_c(CYAN, profile.get('ownership', 'SOCIOS'))}")
+        print(f"  Presupuesto: {_c(YELLOW, f'â‚¬{budget:,.0f}')}")
+        print(
+            f"  Tope salarial ({PRESIDENT_CAP_LABELS.get(profile.get('salary_cap_mode', 'BALANCED'), 'Equilibrado')}): "
+            f"{_c(CYAN, f'â‚¬{cap_k:,}K/sem')}  |  Masa actual: {_c(CYAN, f'â‚¬{bill_k:,}K/sem')}  |  "
+            f"Margen: {_c(room_color, f'â‚¬{room_k:+,}K/sem')}"
+        )
+        print(f"  Presion junta/mercado: {_c(GRAY, str(profile.get('pressure', 0)))}")
+        print()
+        print(_c(CYAN, "  1. Ajustar tope salarial"))
+        print(_c(CYAN, "  2. Entrada de inversor privado"))
+        print(_c(CYAN, "  3. Operacion club-estado"))
+        print(_c(CYAN, "  4. Salida a bolsa (IPO)"))
+        print(_c(CYAN, "  5. Pelotazo inmobiliario"))
+        print(_c(CYAN, "  0. Volver"))
+        op = input_int("  Opcion: ", 0, 5)
+        if op == 0:
+            _save_career(data)
+            return
+
+        if op == 1:
+            print(_c(CYAN, "  1.Estricto  2.Equilibrado  3.Flexible"))
+            mode_opt = input_int("  Modo (1-3): ", 1, 3)
+            mode = ("STRICT", "BALANCED", "FLEX")[mode_opt - 1]
+            _set_salary_cap_mode(data, mgr_team, mode)
+            _save_career(data)
+            continue
+
+        if op == 2:
+            rounds = int(profile.get("investor_rounds", 0))
+            if rounds >= 2:
+                print(_c(RED, "  Ya has agotado las dos rondas de inversores esta etapa.\n"))
+                continue
+            prestige = int(data.get("manager", {}).get("prestige", 1))
+            injection = int((8_000_000 + prestige * 2_500_000) * (0.85 + rng.random() * 0.30))
+            data["budget"] = int(data.get("budget", 0)) + injection
+            profile["ownership"] = "PRIVATE"
+            profile["investor_rounds"] = rounds + 1
+            profile["pressure"] = int(profile.get("pressure", 0)) + 1
+            profile["salary_cap_k"] = int(profile.get("salary_cap_k", 0) * 1.08)
+            data.setdefault("news", []).append(
+                f"Consejo: entra inversor privado (+â‚¬{injection:,.0f}). Exigencia deportiva al alza."
+            )
+            _save_career(data)
+            print(_c(GREEN, f"  âœ“ Inversor firmado. Inyeccion: â‚¬{injection:,.0f}\n"))
+            continue
+
+        if op == 3:
+            if profile.get("ownership") == "STATE":
+                print(_c(GRAY, "  El club ya opera como proyecto de estado.\n"))
+                continue
+            injection = int(35_000_000 * (0.9 + rng.random() * 0.25))
+            data["budget"] = int(data.get("budget", 0)) + injection
+            profile["ownership"] = "STATE"
+            profile["pressure"] = int(profile.get("pressure", 0)) + 2
+            profile["salary_cap_k"] = int(profile.get("salary_cap_k", 0) * 1.35)
+            data.setdefault("news", []).append(
+                f"Operacion club-estado cerrada (+â‚¬{injection:,.0f}). El liston institucional sube."
+            )
+            _save_career(data)
+            print(_c(GREEN, f"  âœ“ Operacion cerrada. Fondos: â‚¬{injection:,.0f}\n"))
+            continue
+
+        if op == 4:
+            if bool(profile.get("ipo_done", False)):
+                print(_c(GRAY, "  El club ya cotiza en bolsa.\n"))
+                continue
+            injection = int(22_000_000 * (0.9 + rng.random() * 0.20))
+            data["budget"] = int(data.get("budget", 0)) + injection
+            profile["ipo_done"] = True
+            profile["ownership"] = "LISTED"
+            profile["pressure"] = int(profile.get("pressure", 0)) + 1
+            profile["salary_cap_k"] = int(profile.get("salary_cap_k", 0) * 1.15)
+            data.setdefault("news", []).append(
+                f"Salida a bolsa completada (+â‚¬{injection:,.0f}). Mercado exige resultados trimestrales."
+            )
+            _save_career(data)
+            print(_c(GREEN, f"  âœ“ IPO completada. Captacion: â‚¬{injection:,.0f}\n"))
+            continue
+
+        if op == 5:
+            if bool(profile.get("pelotazo_done", False)):
+                print(_c(GRAY, "  Ya ejecutaste un pelotazo inmobiliario esta etapa.\n"))
+                continue
+            injection = int(16_000_000 * (0.9 + rng.random() * 0.35))
+            data["budget"] = int(data.get("budget", 0)) + injection
+            profile["pelotazo_done"] = True
+            profile["pressure"] = int(profile.get("pressure", 0)) + 1
+            profile["salary_cap_k"] = int(profile.get("salary_cap_k", 0) * 1.05)
+            data.setdefault("news", []).append(
+                f"Pelotazo inmobiliario aprobado (+â‚¬{injection:,.0f}). Aumenta la tension social en el entorno."
+            )
+            _save_career(data)
+            print(_c(GREEN, f"  âœ“ Operacion urbanistica cerrada. Entrada: â‚¬{injection:,.0f}\n"))
+
+
 # ---------------------------------------------------------------------------
 # Modo Entrenador â€” animated pitch view
 # ---------------------------------------------------------------------------
 
-_COMM_ATT = [
-    "Disparo que sale desviado.",
-    "Fuera de juego â€” el juego continÃºa.",
-    "CÃ³rner. El portero atrapa el balÃ³n.",
-    "Remate de cabeza al larguero.",
-    "Gran parada del portero.",
-    "Falta peligrosa desde la frontal.",
-    "BalÃ³n en el Ã¡rea pero sin rematador.",
-    "El delantero controla y dispara â€” fuera.",
+_COMM_ATT_OUR = [
+    "Centro raso al area, corta la defensa.",
+    "Disparo lejano, fuera por poco.",
+    "Corner a favor, despeja el primer palo.",
+    "Pase al hueco, llega antes el portero.",
+    "Remate de cabeza, gran parada.",
+    "Balon suelto en el area, nadie empuja.",
+    "Buena pared por dentro, remate bloqueado.",
+    "Falta peligrosa al borde del area rival.",
+]
+
+_COMM_ATT_RIVAL = [
+    "El rival llega por banda, centro pasado.",
+    "Disparo rival desde media distancia, fuera.",
+    "Corner en contra, despeja tu central.",
+    "Pase filtrado rival, salva tu portero.",
+    "Remate visitante, toca en un defensor.",
+    "Balon muerto en tu area, consigues sacar.",
+    "Combinacion rival en frontal, chute alto.",
+    "Falta lateral para el rival, respiras al despejar.",
 ]
 
 _COMM_MID = [
-    "El juego se detiene por una falta.",
-    "Duelo fÃ­sico en el centro del campo.",
-    "La aficiÃ³n anima a su equipo.",
-    "BalÃ³n dividido cerca del Ã¡rea central.",
-    "El Ã¡rbitro pita falta.",
-    "Ritmo de partido alto.",
-    "Intercambio de posiciones en el centro.",
-    "El balÃ³n recorre el campo de lado a lado.",
+    "Duelo fisico en el centro del campo.",
+    "La aficion aprieta y el ritmo sube.",
+    "Balon dividido en la medular.",
+    "El arbitro corta una transicion por falta.",
+    "Intercambio de posesion sin dominador claro.",
+    "El partido entra en fase de ida y vuelta.",
+    "Los dos equipos ajustan lineas en medio campo.",
+    "Minutos de control con tension tactica.",
 ]
-
 
 def _squad_rows(players: list["Player"]):
     """Split squad into GK / DEF / MID / ATT for pitch display (â‰¤4 each)."""
@@ -2140,6 +2584,7 @@ def _match_entrenador(
     away_base = away.strength()
     our_base = home_base if is_home_mgr else away_base
     opp_base = away_base if is_home_mgr else home_base
+    comp_goal_factor = (_competition_goal_factor(home.comp) + _competition_goal_factor(away.comp)) * 0.5
 
     # Mutable state refs
     cur = [0, 0]              # score home/away
@@ -2162,7 +2607,32 @@ def _match_entrenador(
     calm_boost = [0]
     momentum = [0.0]          # positive favours manager
 
-    TICK = 0.11
+    speed_mode_raw = os.getenv("PCF_COACH_SPEED", "human").strip().lower()
+    if speed_mode_raw in ("fast", "qa", "bot"):
+        speed_mode = "FAST"
+        TICK = 0.11
+        sleep_scale = 0.40
+    else:
+        # Modo humano: experiencia de 5-8 minutos por partido aprox.
+        speed_mode = "HUMAN"
+        TICK = 3.5
+        sleep_scale = 1.0
+
+    if speed_mode == "HUMAN":
+        # Partidos más cargados de sucesos y narración frecuente.
+        event_boost = 1.50
+        narration_every_minutes = max(1, int(round(10.0 / max(TICK, 0.01))))
+        micro_event_base = 0.14
+    else:
+        event_boost = 1.0
+        narration_every_minutes = 0
+        micro_event_base = 0.04
+    last_narration_minute = [0]
+
+    def _wait(seconds: float):
+        if seconds <= 0:
+            return
+        time.sleep(seconds * sleep_scale)
 
     def clamp(v: float, lo: float, hi: float) -> float:
         return max(lo, min(hi, v))
@@ -2196,6 +2666,20 @@ def _match_entrenador(
         payload = (msg + "\n  " + status) if msg else status
         _draw_frame(home, away, is_home_mgr, cur[0], cur[1], minute, ball[0], payload)
 
+    def narration_message(minute: int) -> str:
+        if narration_every_minutes <= 0:
+            return ""
+        if minute - last_narration_minute[0] < narration_every_minutes:
+            return ""
+        last_narration_minute[0] = minute
+        if ball[0] <= 1:
+            msg = rng.choice(_COMM_ATT_OUR)
+        elif ball[0] >= 3:
+            msg = rng.choice(_COMM_ATT_RIVAL)
+        else:
+            msg = rng.choice(_COMM_MID)
+        return _c(GRAY, f"NARRADOR: {msg}")
+
     def decay_orders():
         for ref in (attack_boost, defend_boost, press_boost, calm_boost):
             if ref[0] > 0:
@@ -2209,7 +2693,7 @@ def _match_entrenador(
             calm_boost[0] = 0
             momentum[0] += 0.12
             draw(minute, _c(BOLD + YELLOW, "ORDEN: Todo al ataque (10')"))
-            time.sleep(0.9)
+            _wait(0.9)
             return True
         if code == "D":
             defend_boost[0] = 10
@@ -2217,21 +2701,21 @@ def _match_entrenador(
             press_boost[0] = 0
             momentum[0] -= 0.05
             draw(minute, _c(BOLD + CYAN, "ORDEN: Bloque bajo (10')"))
-            time.sleep(0.9)
+            _wait(0.9)
             return True
         if code == "P":
             press_boost[0] = 8
             calm_boost[0] = 0
             momentum[0] += 0.08
             draw(minute, _c(BOLD + YELLOW, "ORDEN: Presion alta (8') · mas riesgo de amarillas"))
-            time.sleep(0.9)
+            _wait(0.9)
             return True
         if code == "C":
             calm_boost[0] = 8
             press_boost[0] = 0
             momentum[0] += 0.03 if manager_leading() else -0.03
             draw(minute, _c(BOLD + CYAN, "ORDEN: Calmar partido / pausa (8')"))
-            time.sleep(0.9)
+            _wait(0.9)
             return True
         return False
 
@@ -2293,13 +2777,13 @@ def _match_entrenador(
 
         goals_h[half_idx] += 1
         draw(minute, _c(gc + BOLD, f"GOOOL {tname} ({source})  ->  {cur[0]}-{cur[1]}"))
-        time.sleep(1.3)
+        _wait(1.3)
 
         # VAR review
         if rng.random() < 0.15:
             var_rev[half_idx] += 1
             draw(minute, _c(BOLD + CYAN, "VAR revisando la accion..."))
-            time.sleep(1.0)
+            _wait(1.0)
             if rng.random() < 0.32:
                 if scored_by_manager:
                     if is_home_mgr:
@@ -2318,10 +2802,10 @@ def _match_entrenador(
                 goals_h[half_idx] -= 1
                 draw(minute, _c(dc + BOLD, "GOL ANULADO por VAR"))
                 ball[0] = 2
-                time.sleep(1.1)
+                _wait(1.1)
                 return
             draw(minute, _c(GREEN + BOLD, "GOL confirmado por VAR"))
-            time.sleep(0.9)
+            _wait(0.9)
 
         offer_stop(minute, _c(gc + BOLD, f"Tras el gol de {tname}: decide rapido."))
         ball[0] = 2
@@ -2329,7 +2813,7 @@ def _match_entrenador(
     def maybe_card(minute):
         half_idx = current_half_idx()
         faltas = int(tactic_ref[0].get("faltas", 2))
-        p_card = 0.008 + (0.004 if faltas == 3 else 0.0) + (0.004 if press_boost[0] > 0 else 0.0)
+        p_card = (0.008 + (0.004 if faltas == 3 else 0.0) + (0.004 if press_boost[0] > 0 else 0.0)) * event_boost
         if rng.random() >= p_card:
             return
 
@@ -2337,30 +2821,30 @@ def _match_entrenador(
         if manager_team_card:
             yellows[half_idx] += 1
             draw(minute, _c(YELLOW, f"Amarilla para {mgr_team_obj.name} ({minute}')"))
-            time.sleep(0.6)
+            _wait(0.6)
 
             p_red = 0.06 + (0.08 if faltas == 3 else 0.0) + (0.05 if press_boost[0] > 0 else 0.0)
             if rng.random() < p_red:
                 reds[0] += 1
                 momentum[0] -= 0.45
                 draw(minute, _c(RED + BOLD, f"ROJA para {mgr_team_obj.name}. Te quedas con {11 - reds[0]}."))
-                time.sleep(0.9)
+                _wait(0.9)
                 offer_stop(minute, _c(RED + BOLD, "Con 10 (o menos): ajusta el plan."))
         else:
             yellows[half_idx] += 1
             rival_name = away.name if is_home_mgr else home.name
             draw(minute, _c(GRAY, f"Amarilla para {rival_name} ({minute}')"))
-            time.sleep(0.5)
+            _wait(0.5)
             if rng.random() < 0.07:
                 reds[1] += 1
                 momentum[0] += 0.35
                 draw(minute, _c(GREEN + BOLD, f"ROJA para {rival_name}. Juegan con {11 - reds[1]}."))
-                time.sleep(0.9)
+                _wait(0.9)
                 offer_stop(minute, _c(GREEN + BOLD, "Rival con uno menos: quieres apretar o pausar?"))
 
     def maybe_injury(minute):
         half_idx = current_half_idx()
-        p_injury = 0.0025 + (0.0015 if press_boost[0] > 0 else 0.0)
+        p_injury = (0.0025 + (0.0015 if press_boost[0] > 0 else 0.0)) * (1.20 if speed_mode == "HUMAN" else 1.0)
         if rng.random() >= p_injury:
             return
 
@@ -2377,7 +2861,26 @@ def _match_entrenador(
         else:
             draw(minute, _c(GRAY, "Golpe leve en el rival. El juego sigue."))
             momentum[0] += 0.05
-        time.sleep(0.7)
+        _wait(0.7)
+
+    def maybe_time_wasting(minute):
+        manager_waste_on = int(tactic_ref[0].get("perdidaTiempo", 0)) == 1
+        if manager_waste_on and manager_leading():
+            p_manager = 0.045 if speed_mode == "HUMAN" else 0.020
+            if minute < 60:
+                p_manager *= 0.60
+            if rng.random() < p_manager:
+                draw(minute, _c(CYAN, "Pierdes tiempo: saques lentos y pausas en banda."))
+                momentum[0] += 0.03
+                _wait(0.25 if speed_mode == "HUMAN" else 0.10)
+                return
+
+        if manager_score() < rival_score() and minute >= 70:
+            p_rival = 0.040 if speed_mode == "HUMAN" else 0.018
+            if rng.random() < p_rival:
+                draw(minute, _c(GRAY, "El rival retrasa la reanudacion y enfria el partido."))
+                momentum[0] -= 0.04
+                _wait(0.25 if speed_mode == "HUMAN" else 0.10)
 
     def minute_strengths() -> tuple[float, float, float]:
         our_adj = _tactic_adj(tactic_ref[0], is_home=False)
@@ -2416,8 +2919,8 @@ def _match_entrenador(
         zone_opp = [0.35, 0.64, 1.00, 1.40, 1.90][ball[0]]
         ratio = our_live / max(our_live + opp_live, 0.01)
 
-        p_our = min(0.35, 0.020 * zone_our * (0.85 + ratio * 0.9) * tempo)
-        p_opp = min(0.35, 0.020 * zone_opp * (0.85 + (1.0 - ratio) * 0.9) * tempo)
+        p_our = min(0.42, 0.020 * zone_our * (0.85 + ratio * 0.9) * tempo * event_boost * comp_goal_factor)
+        p_opp = min(0.42, 0.020 * zone_opp * (0.85 + (1.0 - ratio) * 0.9) * tempo * event_boost * comp_goal_factor)
 
         r = rng.random()
         if r < p_our:
@@ -2428,14 +2931,15 @@ def _match_entrenador(
                 conv -= 0.03
             if calm_boost[0] > 0:
                 conv -= 0.02
+            conv *= comp_goal_factor
             conv = clamp(conv, 0.07, 0.62)
 
             if rng.random() < conv:
                 register_goal(True, minute, "jugada")
             else:
-                msg = rng.choice(_COMM_ATT)
+                msg = rng.choice(_COMM_ATT_OUR)
                 draw(minute, _c(YELLOW, f"Ocasion tuya: {msg}"))
-                time.sleep(0.35)
+                _wait(0.35)
             return
 
         if r < p_our + p_opp:
@@ -2444,16 +2948,29 @@ def _match_entrenador(
                 conv -= 0.04
             if attack_boost[0] > 0:
                 conv += 0.04
+            conv *= comp_goal_factor
             conv = clamp(conv, 0.07, 0.60)
 
             if rng.random() < conv:
                 register_goal(False, minute, "contra rival")
             else:
-                draw(minute, _c(GRAY, f"Rival avisa: {rng.choice(_COMM_ATT)}"))
-                time.sleep(0.30)
+                draw(minute, _c(GRAY, f"Rival avisa: {rng.choice(_COMM_ATT_RIVAL)}"))
+                _wait(0.30)
+            return
+
+        # Sin ocasion clara, pero mantenemos continuidad narrativa del partido.
+        p_live = micro_event_base if ball[0] != 2 else micro_event_base * 0.55
+        if rng.random() < p_live:
+            if ball[0] <= 1:
+                draw(minute, _c(YELLOW, rng.choice(_COMM_ATT_OUR)))
+            elif ball[0] >= 3:
+                draw(minute, _c(GRAY, rng.choice(_COMM_ATT_RIVAL)))
+            else:
+                draw(minute, _c(GRAY, rng.choice(_COMM_MID)))
+            _wait(0.25 if speed_mode == "HUMAN" else 0.10)
 
     # Kickoff
-    draw(1, _c(GRAY, "[Intro] para comenzar..."))
+    draw(1, _c(GRAY, f"[Intro] para comenzar... ({speed_mode})"))
     input()
 
     # 1st half
@@ -2461,12 +2978,13 @@ def _match_entrenador(
         maybe_chance(minute)
         maybe_card(minute)
         maybe_injury(minute)
+        maybe_time_wasting(minute)
 
-        if minute in (30, 40):
+        if minute in (25, 30, 40):
             offer_stop(minute, _c(CYAN, "Parada tactica de banquillo."))
-
-        draw(minute)
-        time.sleep(TICK)
+        narr = narration_message(minute)
+        draw(minute, narr if narr else "")
+        _wait(TICK)
 
         decay_orders()
         momentum[0] *= 0.92
@@ -2474,10 +2992,10 @@ def _match_entrenador(
     # Added time 1st half
     at1 = max(1, min(6, 1 + yellows[0] + var_rev[0] * 2 + goals_h[0] + reds[0] + reds[1] + rng.randint(0, 1)))
     draw(f"45+{at1}", _c(BOLD + YELLOW, f"Tiempo anadido: +{at1}"))
-    time.sleep(1.0)
+    _wait(1.0)
     for a in range(1, at1 + 1):
         draw(f"45+{a}")
-        time.sleep(TICK * 0.6)
+        _wait(TICK * 0.6)
 
     # Halftime
     halfdone[0] = True
@@ -2520,14 +3038,15 @@ def _match_entrenador(
         maybe_chance(minute)
         maybe_card(minute)
         maybe_injury(minute)
+        maybe_time_wasting(minute)
 
-        if minute in (60, 70, 80) and wins[0] > 0 and subs[0] > 0:
+        if minute in (55, 60, 70, 80) and wins[0] > 0 and subs[0] > 0:
             offer_stop(minute, _c(CYAN, f"min {minute}: ventana de decisiones"))
         elif minute in (75, 85):
             offer_stop(minute, _c(CYAN, f"min {minute}: tramo clave, decide."))
-
-        draw(minute)
-        time.sleep(TICK)
+        narr = narration_message(minute)
+        draw(minute, narr if narr else "")
+        _wait(TICK)
 
         decay_orders()
         momentum[0] *= 0.92
@@ -2540,10 +3059,10 @@ def _match_entrenador(
            + (2 if int(tactic_ref[0].get("perdidaTiempo", 0)) == 1 else 0)
            + rng.randint(0, 2)))
     draw(90, _c(BOLD + YELLOW, f"Tiempo anadido: +{at2}"))
-    time.sleep(1.1)
+    _wait(1.1)
     for a in range(1, at2 + 1):
         draw(f"90+{a}")
-        time.sleep(TICK * 0.5)
+        _wait(TICK * 0.5)
 
     fhg, fag = cur[0], cur[1]
     won = (is_home_mgr and fhg > fag) or (not is_home_mgr and fag > fhg)
@@ -2597,6 +3116,7 @@ def _apply_squad_changes(mgr_team: Team, all_slots: dict[int, Team], data: dict)
 def _market_buy(data: dict, mgr_team: Team, all_slots: dict[int, Team],
                 liga1: list[Team], liga2: list[Team]):
     budget    = data.get("budget", 0)
+    _ensure_president_profile(data, mgr_team)
     mgr_names = {p.name for p in mgr_team.players}
 
     avail: list[tuple[Team, Player]] = [
@@ -2645,6 +3165,16 @@ def _market_buy(data: dict, mgr_team: Team, all_slots: dict[int, Team],
     if fee > budget:
         print(_c(RED, f"  Sin presupuesto (necesitas â‚¬{fee:,.0f}, tienes â‚¬{budget:,.0f}).\n"))
         return
+    cap_ok, projected_k, cap_k = _can_register_with_cap(data, mgr_team, player)
+    if not cap_ok:
+        print(
+            _c(
+                RED,
+                "  Operacion bloqueada por tope salarial: "
+                f"masa proyectada â‚¬{projected_k:,}K/sem > tope â‚¬{cap_k:,}K/sem.\n",
+            )
+        )
+        return
     print(_c(YELLOW, f"\n  Fichar {player.name} de {src_team.name} por â‚¬{fee:,.0f}?"))
     if input_int("  1.Confirmar  0.Cancelar: ", 0, 1) == 0:
         return
@@ -2690,10 +3220,20 @@ def _market_menu(data: dict, mgr_team: Team, all_slots: dict[int, Team],
     tot_md   = 38 if data["competition"] == "ES1" else 42
     window   = _is_window_open(cur_md, tot_md)
     budget   = data.get("budget", 0)
+    profile  = _ensure_president_profile(data, mgr_team)
+    bill_k   = _team_wage_bill_k(mgr_team)
+    cap_k    = int(profile.get("salary_cap_k", 0))
     status   = _c(GREEN, "ABIERTA") if window else _c(RED, "CERRADA")
 
     print(_c(BOLD + YELLOW, "\n  â•â•â• MERCADO DE FICHAJES â•â•â•"))
     print(f"  {mgr_team.name}   |   Presupuesto: â‚¬{budget:,.0f}   |   Ventana: {status}")
+    print(
+        _c(
+            GRAY,
+            f"  Tope salarial: â‚¬{cap_k:,}K/sem  |  Masa actual: â‚¬{bill_k:,}K/sem  "
+            f"({PRESIDENT_CAP_LABELS.get(profile.get('salary_cap_mode', 'BALANCED'), 'Equilibrado')})",
+        )
+    )
     print()
     while True:
         print(_c(CYAN, "  1. Buscar jugadores"))
@@ -2725,6 +3265,7 @@ def _winter_market_menu(data: dict, mgr_team: Team, comp_teams: list[Team], md: 
         return
 
     budget = int(data.get("budget", 0))
+    _ensure_president_profile(data, mgr_team)
     mgr_names = {p.name for p in mgr_team.players}
     pool: list[tuple[Team, Player]] = [
         (t, p)
@@ -2758,6 +3299,16 @@ def _winter_market_menu(data: dict, mgr_team: Team, comp_teams: list[Team], md: 
     fee = int(player.market_value)
     if fee > budget:
         print(_c(RED, f"  Sin presupuesto (necesitas â‚¬{fee:,.0f}, tienes â‚¬{budget:,.0f}).\n"))
+        return
+    cap_ok, projected_k, cap_k = _can_register_with_cap(data, mgr_team, player)
+    if not cap_ok:
+        print(
+            _c(
+                RED,
+                "  Operacion bloqueada por tope salarial: "
+                f"masa proyectada â‚¬{projected_k:,}K/sem > tope â‚¬{cap_k:,}K/sem.\n",
+            )
+        )
         return
 
     if input_int("  1. Confirmar fichaje  0. Cancelar: ", 0, 1) == 0:
@@ -3754,12 +4305,14 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
     mgr_team  = {t.slot_id: t for t in comp_t}[mgr_slot]
     mgr_name  = data["manager"]["name"]
     _ensure_manager_depth(data)
+    play_mode = _ensure_manager_play_mode(data)
     seed      = data["season_seed"]
     tbs       = {t.slot_id: t for t in comp_t}   # teams_by_slot
     all_slots = {t.slot_id: t for t in liga1 + liga2 + liga_rfef + all_foreign}
 
     # Apply saved squad changes (fichajes/ventas)
     _apply_squad_changes(mgr_team, all_slots, data)
+    _ensure_president_profile(data, mgr_team)
     data.setdefault("players", _build_players_snapshot(liga1 + liga_rfef + all_foreign, liga2, data.get("season", "2025-26")))
     if not isinstance(data.get("copa"), dict) or data.get("copa", {}).get("season") != data.get("season"):
         data["copa"] = _init_copa_state(data, liga1, liga2)
@@ -3784,8 +4337,9 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
     cur_md  = data.get("current_matchday", 1)
 
     while cur_md <= tot_md:
+        play_mode = _ensure_manager_play_mode(data)
         standings = _standings_from_results(results, tbs)
-        _pm_header(data, cur_md, tot_md)
+        _pm_header(data, cur_md, tot_md, mgr_team)
         _mini_standings(standings, mgr_slot, n_rel)
 
         my_fix = next(((h, a) for h, a in fix_by_md.get(cur_md, [])
@@ -3827,9 +4381,11 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
         print(_c(CYAN,  "  8. Entrenamiento y staff"))
         print(_c(CYAN,  "  9. Competiciones UEFA"))
         print(_c(CYAN,  " 10. Seleccion espanola"))
+        print(_c(CYAN,  " 11. Despacho del presidente"))
+        print(_c(CYAN,  f" 12. Nivel de control ({_play_mode_label(play_mode)})"))
         print(_c(CYAN,  "  0. Guardar y salir"))
 
-        op = input_int("  OpciÃ³n: ", 0, 10)
+        op = input_int("  OpciÃ³n: ", 0, 12)
 
         if op == 0:
             data["current_matchday"] = cur_md
@@ -3845,13 +4401,17 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
                 ht           = tactic if h.slot_id == mgr_slot else None
                 at           = tactic if a.slot_id == mgr_slot else None
                 if is_mgr_match:
-                    print(_c(CYAN, "\n  Modo de partido:"))
-                    print(_c(CYAN, "  1. Simular automÃ¡ticamente"))
-                    print(_c(CYAN, "  2. Modo Entrenador  (fichas animadas)"))
-                    pm = input_int("  OpciÃ³n (1-2): ", 1, 2)
-                    if pm == 2:
-                        hg, ag = _match_entrenador(h, a, s, mgr_slot, data)
+                    if _play_mode_allows_coach_match(play_mode):
+                        print(_c(CYAN, "\n  Modo de partido:"))
+                        print(_c(CYAN, "  1. Simular automÃ¡ticamente"))
+                        print(_c(CYAN, "  2. Modo Entrenador  (fichas animadas)"))
+                        pm = input_int("  OpciÃ³n (1-2): ", 1, 2)
+                        if pm == 2:
+                            hg, ag = _match_entrenador(h, a, s, mgr_slot, data)
+                        else:
+                            hg, ag = simulate_match(h, a, s, home_tactic=ht, away_tactic=at)
                     else:
+                        print(_c(GRAY, "  Nivel Basico: partido del manager simulado automaticamente."))
                         hg, ag = simulate_match(h, a, s, home_tactic=ht, away_tactic=at)
                 else:
                     hg, ag = simulate_match(h, a, s)
@@ -3862,6 +4422,19 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             new_items = _append_dynamic_news(
                 news, cur_md, md_res, tbs, mgr_slot, mgr_team, mgr_name, new_st, n_rel
             )
+            my_r = next((r for r in md_res if r["h"] == mgr_slot or r["a"] == mgr_slot), None)
+            mgr_pos = next((i + 1 for i, s in enumerate(new_st) if s.team.slot_id == mgr_slot), len(new_st))
+            if _play_mode_allows_president(play_mode):
+                _president_matchday_effects(
+                    data=data,
+                    md=cur_md,
+                    mgr_team=mgr_team,
+                    my_r=my_r,
+                    mgr_pos=mgr_pos,
+                    total=len(new_st),
+                    n_rel=n_rel,
+                    news=news,
+                )
             if new_items:
                 for ni in new_items:
                     print(_c(YELLOW, f"  ðŸ“° {ni}"))
@@ -3897,7 +4470,10 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             tactic = data.get("tactic", tactic)
 
         elif op == 8:
-            _manager_depth_menu(data)
+            if _play_mode_allows_manager_depth(play_mode):
+                _manager_depth_menu(data)
+            else:
+                print(_c(GRAY, "  Disponible en nivel Estandar o Total.\n"))
 
         elif op == 9:
             _show_euro_status(data, all_slots, mgr_slot)
@@ -3906,6 +4482,15 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
         elif op == 10:
             _show_national_team(data, cur_md, all_slots)
             _pause()
+
+        elif op == 11:
+            if _play_mode_allows_president(play_mode):
+                _president_menu(data, mgr_team)
+            else:
+                print(_c(GRAY, "  Despacho del presidente solo disponible en nivel Total.\n"))
+
+        elif op == 12:
+            play_mode = _play_mode_menu(data)
 
         elif op == 5:
             print(_c(YELLOW, f"\n  Simulando jornadas {cur_md}â€“{tot_md}..."))
@@ -3931,6 +4516,20 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
                     _standings_from_results(results, tbs),
                     n_rel,
                 )
+                new_st = _standings_from_results(results, tbs)
+                my_r = next((r for r in md_res if r["h"] == mgr_slot or r["a"] == mgr_slot), None)
+                mgr_pos = next((i + 1 for i, s in enumerate(new_st) if s.team.slot_id == mgr_slot), len(new_st))
+                if _play_mode_allows_president(play_mode):
+                    _president_matchday_effects(
+                        data=data,
+                        md=md,
+                        mgr_team=mgr_team,
+                        my_r=my_r,
+                        mgr_pos=mgr_pos,
+                        total=len(new_st),
+                        n_rel=n_rel,
+                        news=news,
+                    )
                 if md == winter_md and not data.get("winter_market_done", False):
                     data["winter_market_done"] = True
                     _save_career(data)
@@ -3997,6 +4596,18 @@ def _setup_season(data: dict, team: Team, liga1: list[Team], liga2: list[Team], 
         "copa":             None,
         "euro":             None,
         "national":         None,
+        "president":        {
+            "ownership": "SOCIOS",
+            "salary_cap_mode": "BALANCED",
+            "salary_cap_k": 0,
+            "pressure": 0,
+            "investor_rounds": 0,
+            "ipo_done": False,
+            "pelotazo_done": False,
+            "last_review_md": 0,
+            "next_review_md": 2,
+            "last_cap_penalty_md": -99,
+        },
     })
     data.setdefault("players", _build_players_snapshot(liga1, liga2, season))
     _save_career(data)
@@ -4038,9 +4649,12 @@ def menu_promanager(liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] 
     data = _load_career()
 
     if data:
+        _ensure_manager_depth(data)
+        _ensure_manager_play_mode(data)
         m = data["manager"]
         print(_c(YELLOW, f"\n  Partida guardada â€” {m['name']}  {_prestige_label(m['prestige'])}"))
         print(f"  {data.get('season','?')}  Â·  {data.get('team_name','?')}  Â·  J{data.get('current_matchday',1)}")
+        print(_c(GRAY, f"  Nivel de control: {_play_mode_label(m.get('play_mode', 'STANDARD'))}"))
         _print_career_summary(data)
         print()
         if data.get("phase") == "POSTSEASON":
@@ -4080,6 +4694,7 @@ def menu_promanager(liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] 
         return
     data = {"manager": {"name": name, "prestige": 1, "total_seasons": 0, "history": []}}
     _ensure_manager_depth(data)
+    _play_mode_menu(data, persist=False)
 
     team = _show_offers(data, liga1, liga2, liga_rfef, liga_foreign)
     _setup_season(data, team, liga1, liga2, "2025-26", liga_rfef, liga_foreign)
