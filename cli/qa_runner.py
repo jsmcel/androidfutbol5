@@ -28,11 +28,6 @@ RUN_TARGETS = [
         "script": ROOT / "cli" / "pcfutbol_cli.py",
         "cwd": ROOT / "cli",
     },
-    {
-        "label": "android_cli",
-        "script": ROOT / "android" / "cli" / "pcfutbol_cli.py",
-        "cwd": ROOT / "android" / "cli",
-    },
 ]
 
 

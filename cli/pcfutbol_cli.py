@@ -3213,7 +3213,7 @@ def menu_multiplayer():
     print(_c(BOLD + CYAN, "  â•‘      MULTIJUGADOR POR TURNOS     â•‘"))
     print(_c(BOLD + CYAN, "  â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
     print(_c(YELLOW, "\n  Esta variante del CLI no incluye multijugador por turnos."))
-    print(_c(GRAY,   "  Usa android/cli/pcfutbol_cli.py para jugar en modo multi.\n"))
+    print(_c(GRAY,   "  Mantendremos un unico CLI canonico en cli/pcfutbol_cli.py.\n"))
     _pause()
 
 
