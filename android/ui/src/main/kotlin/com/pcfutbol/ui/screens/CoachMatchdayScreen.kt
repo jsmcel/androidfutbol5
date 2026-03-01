@@ -1,5 +1,7 @@
 package com.pcfutbol.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -67,6 +69,8 @@ import com.pcfutbol.ui.viewmodels.CoachCommand
 import com.pcfutbol.ui.viewmodels.MatchdayViewModel
 import kotlinx.coroutines.delay
 import org.json.JSONArray
+import kotlin.math.abs
+import kotlin.math.max
 
 @Composable
 fun CoachMatchdayScreen(
@@ -78,7 +82,11 @@ fun CoachMatchdayScreen(
 ) {
     val state by vm.uiState.collectAsState()
     val replayEvents = remember { mutableStateListOf<CoachEventUi>() }
-    var ballZone by remember { mutableIntStateOf(2) } // 0 ataque local, 4 ataque visitante
+    var ballPosition by remember { mutableStateOf(CoachBallPosition(x = 0.5f, y = 0.5f)) }
+    var liveMinute by remember { mutableIntStateOf(1) }
+    var liveHomeGoals by remember { mutableIntStateOf(0) }
+    var liveAwayGoals by remember { mutableIntStateOf(0) }
+    var replayInProgress by remember { mutableStateOf(false) }
     var selectedFixtureId by remember(matchday) { mutableIntStateOf(-1) }
     var replayNonce by remember { mutableIntStateOf(0) }
     var command by remember { mutableStateOf(CoachCommand.BALANCED) }
@@ -104,7 +112,11 @@ fun CoachMatchdayScreen(
 
     LaunchedEffect(selectedFixture?.id, selectedFixture?.eventsJson, replayNonce) {
         replayEvents.clear()
-        ballZone = 2
+        ballPosition = CoachBallPosition(x = 0.5f, y = 0.5f)
+        liveMinute = 1
+        liveHomeGoals = 0
+        liveAwayGoals = 0
+        replayInProgress = false
         selectedFixture ?: return@LaunchedEffect
         replayEvents += CoachEventUi(
             minute = 1,
@@ -112,13 +124,36 @@ fun CoachMatchdayScreen(
             teamId = -1,
             description = "INICIO DEL PARTIDO",
         )
-        if (!selectedFixture.played || selectedEvents.isEmpty()) return@LaunchedEffect
-        val homeTeamId = selectedFixture.homeTeamId
-        selectedEvents.sortedBy { it.minute }.forEach { event ->
-            delay(140)
-            replayEvents += event
-            ballZone = zoneForEvent(event, homeTeamId)
+        if (!selectedFixture.played || selectedEvents.isEmpty()) {
+            if (selectedFixture.played) {
+                liveHomeGoals = selectedFixture.homeGoals.coerceAtLeast(0)
+                liveAwayGoals = selectedFixture.awayGoals.coerceAtLeast(0)
+                liveMinute = 90
+            }
+            return@LaunchedEffect
         }
+        replayInProgress = true
+        val homeTeamId = selectedFixture.homeTeamId
+        var previousMinute = 1
+        selectedEvents.sortedBy { it.minute }.forEach { event ->
+            val minute = event.minute.coerceAtLeast(1)
+            val minuteDelta = (minute - previousMinute).coerceAtLeast(1)
+            delay((70L + minuteDelta * 9L).coerceAtMost(260L))
+            replayEvents += event
+            liveMinute = minute
+            if (event.type == "GOAL") {
+                when (event.teamId) {
+                    selectedFixture.homeTeamId -> liveHomeGoals += 1
+                    selectedFixture.awayTeamId -> liveAwayGoals += 1
+                }
+            }
+            ballPosition = ballPositionForEvent(event, homeTeamId)
+            previousMinute = minute
+        }
+        liveHomeGoals = selectedFixture.homeGoals.coerceAtLeast(0)
+        liveAwayGoals = selectedFixture.awayGoals.coerceAtLeast(0)
+        liveMinute = max(liveMinute, 90)
+        replayInProgress = false
     }
 
     Column(
@@ -209,6 +244,10 @@ fun CoachMatchdayScreen(
                         fixture = fixture,
                         home = state.teamNames[fixture.homeTeamId] ?: "LOCAL",
                         away = state.teamNames[fixture.awayTeamId] ?: "VISITANTE",
+                        displayHomeGoals = if (fixture.played) liveHomeGoals else -1,
+                        displayAwayGoals = if (fixture.played) liveAwayGoals else -1,
+                        minute = liveMinute,
+                        replayInProgress = replayInProgress,
                     )
 
                     Spacer(Modifier.height(8.dp))
@@ -219,7 +258,7 @@ fun CoachMatchdayScreen(
                             .height(250.dp)
                             .border(1.dp, DosGray),
                     ) {
-                        CoachPitch(ballZone = ballZone)
+                        CoachPitch(ballPosition = ballPosition)
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -348,44 +387,73 @@ private fun Scoreboard(
     fixture: FixtureEntity,
     home: String,
     away: String,
+    displayHomeGoals: Int,
+    displayAwayGoals: Int,
+    minute: Int,
+    replayInProgress: Boolean,
 ) {
     DosPanel(title = "MARCADOR") {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = home,
-                color = DosCyan,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.End,
-            )
-            Text(
-                text = if (fixture.played) "${fixture.homeGoals} - ${fixture.awayGoals}" else "? - ?",
-                color = DosYellow,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                modifier = Modifier.padding(horizontal = 10.dp),
-            )
-            Text(
-                text = away,
-                color = DosWhite,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                modifier = Modifier.weight(1f),
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = home,
+                    color = DosCyan,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.End,
+                )
+                Text(
+                    text = if (fixture.played) "$displayHomeGoals - $displayAwayGoals" else "? - ?",
+                    color = DosYellow,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                )
+                Text(
+                    text = away,
+                    color = DosWhite,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "MIN ${minute.coerceIn(1, 120)}",
+                    color = DosLightGray,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                )
+                Text(
+                    text = when {
+                        !fixture.played -> "PENDIENTE"
+                        replayInProgress -> "REPLAY EN VIVO"
+                        else -> "FINAL"
+                    },
+                    color = if (replayInProgress) DosGreen else DosGray,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun CoachPitch(ballZone: Int) {
+private fun CoachPitch(ballPosition: CoachBallPosition) {
     val homeColor = DosCyan
     val awayColor = DosLightGray
     val homeFormation = listOf(
@@ -396,13 +464,16 @@ private fun CoachPitch(ballZone: Int) {
         0.5f to 0.12f, 0.15f to 0.28f, 0.38f to 0.28f, 0.62f to 0.28f, 0.85f to 0.28f,
         0.22f to 0.48f, 0.5f to 0.48f, 0.78f to 0.48f, 0.2f to 0.65f, 0.5f to 0.7f, 0.8f to 0.65f,
     )
-    val ballTarget = when (ballZone) {
-        0 -> 0.12f
-        1 -> 0.30f
-        2 -> 0.50f
-        3 -> 0.70f
-        else -> 0.88f
-    }
+    val ballX by animateFloatAsState(
+        targetValue = ballPosition.x.coerceIn(0.08f, 0.92f),
+        animationSpec = tween(durationMillis = 260),
+        label = "ballX",
+    )
+    val ballY by animateFloatAsState(
+        targetValue = ballPosition.y.coerceIn(0.08f, 0.92f),
+        animationSpec = tween(durationMillis = 260),
+        label = "ballY",
+    )
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -419,22 +490,31 @@ private fun CoachPitch(ballZone: Int) {
         }
 
         @Composable
-        fun ChipAt(x: Float, y: Float, color: Color) {
+        fun ChipAt(x: Float, y: Float, color: Color, label: String) {
             Box(
                 modifier = Modifier
-                    .offset(x = maxWidth * x - 6.dp, y = maxHeight * y - 6.dp)
-                    .size(12.dp)
+                    .offset(x = maxWidth * x - 8.dp, y = maxHeight * y - 8.dp)
+                    .size(16.dp)
                     .background(color = color, shape = CircleShape),
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    color = DosBlack,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
 
-        homeFormation.forEach { (x, y) -> ChipAt(x, y, homeColor) }
-        awayFormation.forEach { (x, y) -> ChipAt(x, y, awayColor) }
+        homeFormation.forEachIndexed { index, (x, y) -> ChipAt(x, y, homeColor, (index + 1).toString()) }
+        awayFormation.forEachIndexed { index, (x, y) -> ChipAt(x, y, awayColor, (index + 1).toString()) }
 
         Box(
             modifier = Modifier
-                .offset(x = maxWidth * 0.5f - 5.dp, y = maxHeight * ballTarget - 5.dp)
-                .size(10.dp)
+                .offset(x = maxWidth * ballX - 6.dp, y = maxHeight * ballY - 6.dp)
+                .size(12.dp)
                 .background(DosYellow, CircleShape),
         )
     }
@@ -444,10 +524,13 @@ private fun CoachPitch(ballZone: Int) {
 private fun EventLine(event: CoachEventUi, isHome: Boolean) {
     val typeColor = when (event.type) {
         "GOAL" -> DosYellow
+        "OWN_GOAL" -> DosYellow
         "VAR_DISALLOWED" -> DosRed
         "TIME_WASTING" -> DosGray
         "RED_CARD" -> DosRed
         "YELLOW_CARD" -> DosYellow
+        "INJURY" -> DosRed
+        "SUBSTITUTION" -> DosCyan
         else -> DosLightGray
     }
     Row(
@@ -486,6 +569,11 @@ private data class CoachEventUi(
     val description: String,
 )
 
+private data class CoachBallPosition(
+    val x: Float,
+    val y: Float,
+)
+
 private fun parseFixtureEvents(eventsJson: String): List<CoachEventUi> {
     if (eventsJson.isBlank()) return emptyList()
     return runCatching {
@@ -506,11 +594,24 @@ private fun parseFixtureEvents(eventsJson: String): List<CoachEventUi> {
     }.getOrDefault(emptyList())
 }
 
-private fun zoneForEvent(event: CoachEventUi, homeTeamId: Int): Int {
+private fun ballPositionForEvent(event: CoachEventUi, homeTeamId: Int): CoachBallPosition {
     val homeSide = event.teamId == homeTeamId
-    return when (event.type) {
-        "GOAL", "VAR_DISALLOWED" -> if (homeSide) 0 else 4
-        "YELLOW_CARD", "RED_CARD", "INJURY", "TIME_WASTING" -> if (homeSide) 1 else 3
-        else -> 2
+    val y = when (event.type) {
+        "GOAL", "OWN_GOAL" -> if (homeSide) 0.12f else 0.88f
+        "VAR_DISALLOWED" -> if (homeSide) 0.20f else 0.80f
+        "YELLOW_CARD", "RED_CARD", "INJURY", "TIME_WASTING" -> if (homeSide) 0.34f else 0.66f
+        "SUBSTITUTION" -> if (homeSide) 0.94f else 0.06f
+        else -> if (homeSide) 0.44f else 0.56f
     }
+    val seed = abs(event.minute * 97 + event.teamId * 13 + event.type.hashCode())
+    val laneOffset = (seed % 54) / 100f // 0.00 .. 0.53
+    val baseX = when (event.type) {
+        "GOAL", "OWN_GOAL", "VAR_DISALLOWED" -> 0.50f
+        "SUBSTITUTION" -> if (homeSide) 0.10f else 0.90f
+        else -> 0.23f + laneOffset
+    }
+    return CoachBallPosition(
+        x = baseX.coerceIn(0.08f, 0.92f),
+        y = y.coerceIn(0.06f, 0.94f),
+    )
 }
