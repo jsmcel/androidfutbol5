@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-PC Fútbol 5 — Clon CLI (Python)
-Temporada 2025/26  ·  Datos reales extraídos del juego original
+PC FÃºtbol 5 â€” Clon CLI (Python)
+Temporada 2025/26  Â·  Datos reales extraÃ­dos del juego original
 
 Uso:
     python pcfutbol_cli.py
 
 Requiere:
-    Python 3.9+  (stdlib sólo, sin dependencias externas)
+    Python 3.9+  (stdlib sÃ³lo, sin dependencias externas)
 """
 
 import csv
@@ -47,22 +47,22 @@ PLAYERS_CSV  = ASSETS_DIR / "pcf55_players_2526.csv"
 TEAMS_JSON   = ASSETS_DIR / "pcf55_teams_extracted.json"
 
 # ---------------------------------------------------------------------------
-# Configuración de competiciones (código CSV → metadatos)
-# Solo se cargan competiciones con ≥14 equipos en el CSV
+# ConfiguraciÃ³n de competiciones (cÃ³digo CSV â†’ metadatos)
+# Solo se cargan competiciones con â‰¥14 equipos en el CSV
 # ---------------------------------------------------------------------------
 COMP_INFO: dict[str, dict] = {
-    "ES1":  {"name": "Primera División",       "country": "España",      "n_rel": 3, "tot_md": 38, "min_teams": 14},
-    "ES2":  {"name": "Segunda División",        "country": "España",      "n_rel": 4, "tot_md": 42, "min_teams": 14},
-    "E3G1": {"name": "1ª RFEF Grupo 1",        "country": "España",      "n_rel": 4, "tot_md": 38, "min_teams": 14},
-    "E3G2": {"name": "1ª RFEF Grupo 2",        "country": "España",      "n_rel": 4, "tot_md": 38, "min_teams": 14},
+    "ES1":  {"name": "Primera DivisiÃ³n",       "country": "EspaÃ±a",      "n_rel": 3, "tot_md": 38, "min_teams": 14},
+    "ES2":  {"name": "Segunda DivisiÃ³n",        "country": "EspaÃ±a",      "n_rel": 4, "tot_md": 42, "min_teams": 14},
+    "E3G1": {"name": "1Âª RFEF Grupo 1",        "country": "EspaÃ±a",      "n_rel": 4, "tot_md": 38, "min_teams": 14},
+    "E3G2": {"name": "1Âª RFEF Grupo 2",        "country": "EspaÃ±a",      "n_rel": 4, "tot_md": 38, "min_teams": 14},
     "GB1":  {"name": "Premier League",          "country": "Inglaterra",  "n_rel": 3, "tot_md": 38, "min_teams": 14},
     "IT1":  {"name": "Serie A",                 "country": "Italia",      "n_rel": 3, "tot_md": 38, "min_teams": 14},
     "L1":   {"name": "Bundesliga",              "country": "Alemania",    "n_rel": 2, "tot_md": 34, "min_teams": 14},
     "FR1":  {"name": "Ligue 1",                 "country": "Francia",     "n_rel": 3, "tot_md": 34, "min_teams": 14},
-    "NL1":  {"name": "Eredivisie",              "country": "Países Bajos","n_rel": 2, "tot_md": 34, "min_teams": 14},
+    "NL1":  {"name": "Eredivisie",              "country": "PaÃ­ses Bajos","n_rel": 2, "tot_md": 34, "min_teams": 14},
     "PO1":  {"name": "Primeira Liga",           "country": "Portugal",    "n_rel": 2, "tot_md": 34, "min_teams": 14},
-    "BE1":  {"name": "Pro League",              "country": "Bélgica",     "n_rel": 2, "tot_md": 30, "min_teams": 14},
-    "TR1":  {"name": "Süper Lig",              "country": "Turquía",     "n_rel": 3, "tot_md": 34, "min_teams": 14},
+    "BE1":  {"name": "Pro League",              "country": "BÃ©lgica",     "n_rel": 2, "tot_md": 30, "min_teams": 14},
+    "TR1":  {"name": "SÃ¼per Lig",              "country": "TurquÃ­a",     "n_rel": 3, "tot_md": 34, "min_teams": 14},
 }
 
 # ---------------------------------------------------------------------------
@@ -88,6 +88,8 @@ class Player:
     remate:  int
     pase:    int
     tiro:    int
+    estado_forma: int = 50
+    moral: int = 50
 
     @property
     def overall(self) -> int:
@@ -121,18 +123,8 @@ class Team:
         return "LIGA1" if self.comp == "ES1" else "LIGA2"
 
     def strength(self) -> float:
-        """Fuerza global del equipo (0-100)."""
-        if not self.players:
-            return 50.0
-        starters = sorted(self.players, key=lambda p: p.overall, reverse=True)[:11]
-        gks   = [p for p in starters if p.is_goalkeeper]
-        field_players = [p for p in starters if not p.is_goalkeeper]
-
-        gk_str  = sum(p.gk_strength() for p in gks) / max(len(gks), 1)
-        att_str = sum(p.attack_strength() for p in field_players) / max(len(field_players), 1)
-        def_str = sum(p.defense_strength() for p in field_players) / max(len(field_players), 1)
-
-        return gk_str * 0.25 + att_str * 0.40 + def_str * 0.35
+        """Fuerza global con la misma fórmula base que el motor Android."""
+        return _calc_team_strength_android(self, tactic=None, is_home=False)
 
 
 @dataclass
@@ -232,39 +224,268 @@ def load_teams() -> dict[str, Team]:
 # Match simulator  (Poisson-based, seed-deterministic)
 # ---------------------------------------------------------------------------
 
-def _poisson_goals(lam: float, rng: random.Random) -> int:
-    """Genera goles con distribución Poisson usando el RNG dado."""
+_MASK_32 = 0xFFFFFFFF
+_INT_32_MIN = -0x80000000
+
+
+def _int32(value: int) -> int:
+    value &= _MASK_32
+    return value if value < 0x80000000 else value - 0x100000000
+
+
+def _ushr32(value: int, bits: int) -> int:
+    return (value & _MASK_32) >> bits
+
+
+class KotlinXorWowRandom:
+    """
+    Implementación Python de kotlin.random.Random(seed) (XorWowRandom),
+    para reproducir seeds del motor Android.
+    """
+    def __init__(self, seed: int):
+        s0 = _int32(seed)
+        s1 = _int32(seed >> 32)
+        self.x = _int32(s0)
+        self.y = _int32(s1)
+        self.z = 0
+        self.w = 0
+        self.v = _int32(s0 ^ -1)
+        self.addend = _int32((s0 << 10) ^ _ushr32(s1, 4))
+        if (self.x | self.y | self.z | self.w | self.v) == 0:
+            raise ValueError("Initial state must have at least one non-zero element.")
+        for _ in range(64):
+            self.next_int_raw()
+
+    def next_int_raw(self) -> int:
+        t = _int32(self.x)
+        t = _int32(t ^ _ushr32(t, 2))
+        self.x = self.y
+        self.y = self.z
+        self.z = self.w
+        vv = self.v
+        self.w = vv
+        t = _int32(t ^ _int32(t << 1) ^ vv ^ _int32(vv << 4))
+        self.v = _int32(t)
+        self.addend = _int32(self.addend + 362437)
+        return _int32(self.v + self.addend)
+
+    def next_bits(self, bit_count: int) -> int:
+        if bit_count <= 0:
+            return 0
+        return _ushr32(self.next_int_raw(), 32 - bit_count)
+
+    def next_boolean(self) -> bool:
+        return self.next_bits(1) != 0
+
+    def next_double(self) -> float:
+        hi = self.next_bits(26)
+        lo = self.next_bits(27)
+        return float((hi << 27) + lo) / 9007199254740992.0
+
+    def next_int(self, bound: int) -> int:
+        return self.next_int_range(0, bound)
+
+    def next_int_range(self, from_inclusive: int, until_exclusive: int) -> int:
+        if not until_exclusive > from_inclusive:
+            raise ValueError("Random range is empty.")
+        n = _int32(until_exclusive - from_inclusive)
+        if n > 0 or n == _INT_32_MIN:
+            if n > 0 and (n & -n) == n:
+                v = self.next_bits(n.bit_length() - 1)
+            else:
+                while True:
+                    bits = _ushr32(self.next_int_raw(), 1)
+                    v = bits % n
+                    if bits - v + (n - 1) >= 0:
+                        break
+            return _int32(from_inclusive + v)
+
+        while True:
+            v = self.next_int_raw()
+            if from_inclusive <= v < until_exclusive:
+                return v
+
+
+def _match_squad(team: Team) -> list[Player]:
+    # Android toma los 11 "mejores" por CA en runtime.
+    return sorted(team.players, key=lambda p: (p.ca, p.me), reverse=True)[:11]
+
+
+def _safe_avg(values: list[float], fallback: float = 50.0) -> float:
+    if not values:
+        return fallback
+    return sum(values) / len(values)
+
+
+def _form_factor(player: Player) -> float:
+    return (player.estado_forma - 50) * 0.05
+
+
+def _runtime_bonus(player: Player) -> float:
+    return (player.estado_forma - 50) * 0.02 + ((player.moral - 50) / 100.0) * 2.0
+
+
+def _gk_strength_android(player: Player) -> float:
+    return player.portero * 0.6 + player.re * 0.2 + player.ca * 0.2 + _form_factor(player)
+
+
+def _def_strength_android(player: Player) -> float:
+    return player.entrada * 0.4 + player.ca * 0.3 + player.ve * 0.2 + player.re * 0.1 + _form_factor(player)
+
+
+def _mid_strength_android(player: Player) -> float:
+    return player.pase * 0.35 + player.ca * 0.3 + player.re * 0.2 + player.tiro * 0.15 + _form_factor(player)
+
+
+def _fwd_strength_android(player: Player) -> float:
+    return player.remate * 0.4 + player.regate * 0.25 + player.ca * 0.2 + player.tiro * 0.15 + _form_factor(player)
+
+
+def _calc_team_strength_android(team: Team, tactic: Optional[dict], is_home: bool) -> float:
+    squad = _match_squad(team)
+    if not squad:
+        return 50.0
+
+    gk = squad[0]
+    defenders = squad[1:5]
+    mids = squad[5:9]
+    fwds = squad[9:11]
+
+    gk_score = _gk_strength_android(gk)
+    def_score = _safe_avg([_def_strength_android(p) for p in defenders])
+    mid_score = _safe_avg([_mid_strength_android(p) for p in mids])
+    fwd_score = _safe_avg([_fwd_strength_android(p) for p in fwds])
+
+    base = gk_score * 0.15 + def_score * 0.3 + mid_score * 0.3 + fwd_score * 0.25
+    tactical_bonus = _tactic_adj(tactic, is_home=is_home)
+    runtime = _safe_avg([_runtime_bonus(p) for p in squad], fallback=0.0)
+    return max(10.0, min(99.0, base + tactical_bonus + runtime))
+
+
+def _strength_to_lambda(strength: float, is_home: bool) -> float:
+    norm = (strength - 10.0) / 89.0
+    lam = 0.4 + norm * 2.6
+    return lam * 1.12 if is_home else lam
+
+
+def _apply_expulsion_penalty(lam: float, red_cards: int) -> float:
+    if red_cards <= 0:
+        return lam
+    return max(0.1, lam * 0.8)
+
+
+def _pace_factors(home_tactic: Optional[dict], away_tactic: Optional[dict]) -> tuple[float, float]:
+    home_waste = int((home_tactic or {}).get("perdidaTiempo", 0)) == 1
+    away_waste = int((away_tactic or {}).get("perdidaTiempo", 0)) == 1
+    if home_waste and away_waste:
+        return 0.82, 0.82
+    if home_waste:
+        return 0.88, 0.92
+    if away_waste:
+        return 0.92, 0.88
+    return 1.0, 1.0
+
+
+def _pick_eligible_slot(lineup_size: int, dismissed: set[int], rng: KotlinXorWowRandom) -> Optional[int]:
+    if lineup_size <= 0:
+        return None
+    eligible = [idx for idx in range(lineup_size) if idx not in dismissed]
+    if not eligible:
+        return None
+    return eligible[rng.next_int(len(eligible))]
+
+
+def _discipline_red_cards(
+    home_lineup: list[Player],
+    away_lineup: list[Player],
+    home_tactic: Optional[dict],
+    away_tactic: Optional[dict],
+    rng: KotlinXorWowRandom,
+) -> tuple[int, int]:
+    home_yellows = [0] * len(home_lineup)
+    away_yellows = [0] * len(away_lineup)
+    home_dismissed: set[int] = set()
+    away_dismissed: set[int] = set()
+    home_red = 0
+    away_red = 0
+
+    yellow_count = _poisson_goals(1.5, rng) + _poisson_goals(1.5, rng)
+    for _ in range(yellow_count):
+        if rng.next_boolean():
+            slot = _pick_eligible_slot(len(home_lineup), home_dismissed, rng)
+            if slot is None:
+                continue
+            home_yellows[slot] += 1
+            if home_yellows[slot] >= 2:
+                home_red += 1
+                home_dismissed.add(slot)
+        else:
+            slot = _pick_eligible_slot(len(away_lineup), away_dismissed, rng)
+            if slot is None:
+                continue
+            away_yellows[slot] += 1
+            if away_yellows[slot] >= 2:
+                away_red += 1
+                away_dismissed.add(slot)
+
+    if int((home_tactic or {}).get("faltas", 2)) == 3 and rng.next_double() < 0.05:
+        slot = _pick_eligible_slot(len(home_lineup), home_dismissed, rng)
+        if slot is not None:
+            home_red += 1
+            home_dismissed.add(slot)
+
+    if int((away_tactic or {}).get("faltas", 2)) == 3 and rng.next_double() < 0.05:
+        slot = _pick_eligible_slot(len(away_lineup), away_dismissed, rng)
+        if slot is not None:
+            away_red += 1
+            away_dismissed.add(slot)
+
+    return home_red, away_red
+
+
+def _apply_var_to_goals(goals: int, rng: KotlinXorWowRandom) -> int:
+    remaining = goals
+    for _ in range(goals):
+        if rng.next_double() < 0.18 and rng.next_double() < 0.38:
+            remaining -= 1
+    return max(0, remaining)
+
+def _poisson_goals(lam: float, rng: KotlinXorWowRandom) -> int:
+    """Poisson con Knuth, alineado con MatchSimulator Android."""
     L   = math.exp(-lam)
     k   = 0
     p   = 1.0
     while True:
         k += 1
-        p *= rng.random()
+        p *= rng.next_double()
         if p <= L:
-            return k - 1
+            return max(0, min(9, k - 1))
 
 
-def _tactic_adj(tactic: Optional[dict]) -> float:
-    """
-    Ajuste de fuerza por táctica — misma fórmula que Android StrengthCalculator.
-    tipoJuego:   1=DEFENSIVO(-1.0) 2=EQUILIBRADO(0) 3=OFENSIVO(+1.5)
-    tipoPresion: 1=BAJA(-0.5)      2=MEDIA(0)       3=ALTA(+1.0)
-    extras menores: marcaje, faltas, contragolpe.
-    """
-    if not tactic:
-        return 0.0
-    adj = 0.0
-    tj = tactic.get("tipoJuego", 2)
-    if tj == 3:    adj += 1.5
-    elif tj == 1:  adj -= 1.0
-    tp = tactic.get("tipoPresion", 2)
-    if tp == 3:    adj += 1.0
-    elif tp == 1:  adj -= 0.5
-    if tactic.get("tipoMarcaje", 1) == 1:        adj += 0.3   # al hombre
-    if tactic.get("faltas", 2) == 3:             adj += 0.2   # duro
-    if tactic.get("porcContra", 30) > 60:        adj += 0.3
-    if tactic.get("tipoDespejes", 1) == 2:       adj += 0.2   # controlado
-    if tactic.get("perdidaTiempo", 0) == 1:      adj -= 0.4   # juego más lento
+def _tactic_adj(tactic: Optional[dict], is_home: bool) -> float:
+    """Misma fórmula que StrengthCalculator.tacticalAdjustment()."""
+    t = tactic or {}
+    adj = 3.0 if is_home else 0.0
+    tj = int(t.get("tipoJuego", 2))
+    if tj == 3:
+        adj += 1.5
+    elif tj == 1:
+        adj -= 1.0
+    tp = int(t.get("tipoPresion", 2))
+    if tp == 3:
+        adj += 1.0
+    elif tp == 1:
+        adj -= 0.5
+    if int(t.get("tipoMarcaje", 1)) == 1:
+        adj += 0.3
+    if int(t.get("faltas", 2)) == 3:
+        adj += 0.2
+    if int(t.get("porcContra", 30)) > 60:
+        adj += 0.3
+    if int(t.get("tipoDespejes", 1)) == 2:
+        adj += 0.2
+    if int(t.get("perdidaTiempo", 0)) == 1:
+        adj -= 0.4
     return adj
 
 
@@ -272,22 +493,27 @@ def simulate_match(home: Team, away: Team, seed: int,
                    home_tactic: Optional[dict] = None,
                    away_tactic: Optional[dict] = None) -> tuple[int, int]:
     """
-    Simulador determinístico con soporte táctico.
-    Devuelve (home_goals, away_goals).
-    Los ajustes tácticos siguen la misma fórmula que Android StrengthCalculator.
+    Simulador determinista alineado con Android:
+    - StrengthCalculator (misma fórmula)
+    - MatchSimulator (Poisson + VAR + rojas + pérdida de tiempo)
     """
-    rng = random.Random(seed)
+    rng = KotlinXorWowRandom(int(seed))
+    home_t = home_tactic or {}
+    away_t = away_tactic or {}
 
-    # Fuerza base + ajuste táctico (igual que Android)
-    home_str = (home.strength() + _tactic_adj(home_tactic)) * 1.05  # ventaja local +5%
-    away_str =  away.strength() + _tactic_adj(away_tactic)
+    home_strength = _calc_team_strength_android(home, home_t, is_home=True)
+    away_strength = _calc_team_strength_android(away, away_t, is_home=False)
+    home_lineup = _match_squad(home)
+    away_lineup = _match_squad(away)
+    home_red, away_red = _discipline_red_cards(home_lineup, away_lineup, home_t, away_t, rng)
 
-    total = max(home_str + away_str, 1.0)
+    home_pace, away_pace = _pace_factors(home_t, away_t)
+    home_lambda = max(0.1, _apply_expulsion_penalty(_strength_to_lambda(home_strength, True), home_red) * home_pace)
+    away_lambda = max(0.1, _apply_expulsion_penalty(_strength_to_lambda(away_strength, False), away_red) * away_pace)
 
-    lambda_home = max(0.3, min(2.8 * (home_str / total), 4.5))
-    lambda_away = max(0.3, min(2.8 * (away_str / total), 4.5))
-
-    return _poisson_goals(lambda_home, rng), _poisson_goals(lambda_away, rng)
+    home_raw = _poisson_goals(home_lambda, rng)
+    away_raw = _poisson_goals(away_lambda, rng)
+    return _apply_var_to_goals(home_raw, rng), _apply_var_to_goals(away_raw, rng)
 
 
 # ---------------------------------------------------------------------------
@@ -295,37 +521,30 @@ def simulate_match(home: Team, away: Team, seed: int,
 # ---------------------------------------------------------------------------
 
 def generate_fixtures(teams: list[Team]) -> list[tuple[Team, Team]]:
-    """Genera todos los fixtures de una temporada completa (doble vuelta)."""
-    n = len(teams)
-    if n % 2 != 0:
-        teams = teams + [Team(slot_id=-1, name="BYE", comp="")]
+    """Genera calendario con el mismo algoritmo de rotación del engine Android."""
+    if len(teams) < 2:
+        return []
+    rotation = list(teams)
+    if len(rotation) % 2 != 0:
+        rotation.append(Team(slot_id=-1, name="BYE", comp=""))
 
-    n = len(teams)
-    fixtures = []
-    rounds_count = n - 1
+    n = len(rotation)
+    rounds = n - 1
+    matches_per_round = n // 2
+    fixtures: list[tuple[Team, Team]] = []
 
-    lst = teams[1:]
-    pivot = teams[0]
+    for _ in range(rounds):
+        for m in range(matches_per_round):
+            home = rotation[m]
+            away = rotation[n - 1 - m]
+            if home.slot_id != -1 and away.slot_id != -1:
+                fixtures.append((home, away))
+        last = rotation.pop()
+        rotation.insert(1, last)
 
-    for r in range(rounds_count):
-        round_home = []
-        round_away = []
-        round_home.append((pivot, lst[r % len(lst)]))
-        for i in range(1, n // 2):
-            h = lst[(r + i) % len(lst)]
-            a = lst[(r - i) % len(lst)]
-            if r % 2 == 0:
-                round_home.append((h, a))
-            else:
-                round_home.append((a, h))
-
-        for h, a in round_home:
-            if h.slot_id != -1 and a.slot_id != -1:
-                fixtures.append((h, a))
-
-    # Segunda vuelta (intercambio local/visitante)
-    second = [(a, h) for h, a in fixtures]
-    return fixtures + second
+    first_leg = list(fixtures)
+    fixtures.extend((away, home) for home, away in first_leg)
+    return fixtures
 
 
 # ---------------------------------------------------------------------------
@@ -338,20 +557,18 @@ def simulate_season(
     seed_base: int = 12345,
     silent: bool = False,
 ) -> list[Standing]:
-    """Simula una temporada completa y devuelve la clasificación final."""
+    """Simula temporada completa con seed por fixture (masterSeed XOR fixtureId)."""
     fixtures = generate_fixtures(teams)
     standings = {t.slot_id: Standing(team=t) for t in teams}
     results: list[MatchResult] = []
-
-    matchdays_total = (len(teams) - 1) * 2
-    fixtures_per_md = len(teams) // 2
+    fixtures_per_md = max(1, len(teams) // 2)
     matchday = 1
 
     for i, (home, away) in enumerate(fixtures):
         if i > 0 and i % fixtures_per_md == 0:
             matchday += 1
-
-        seed = seed_base ^ (matchday * 1000 + home.slot_id * 31 + away.slot_id)
+        fixture_id = i + 1
+        seed = int(seed_base) ^ fixture_id
         hg, ag = simulate_match(home, away, seed)
 
         result = MatchResult(home=home, away=away,
@@ -392,9 +609,9 @@ def _c(color: str, text: str) -> str:
 
 def print_standings(standings: list[Standing], title: str, relegated_from: int = 0, promoted_to: int = 0):
     print()
-    print(_c(BOLD + YELLOW, f"  ═══ {title} ═══"))
+    print(_c(BOLD + YELLOW, f"  â•â•â• {title} â•â•â•"))
     print(_c(GRAY, f"  {'#':>3}  {'EQUIPO':<24} {'PJ':>3} {'G':>3} {'E':>3} {'P':>3} {'GF':>3} {'GC':>3} {'DG':>4} {'PTS':>4}"))
-    print(_c(GRAY, "  " + "─" * 62))
+    print(_c(GRAY, "  " + "â”€" * 62))
 
     for pos, st in enumerate(standings, 1):
         name  = st.team.name[:23]
@@ -427,7 +644,7 @@ def print_matchday(results: list[MatchResult], matchday: int, team_filter: Optio
         print(_c(GRAY, f"  Sin partidos en jornada {matchday}."))
         return
 
-    print(_c(YELLOW, f"\n  ─── Jornada {matchday} ───"))
+    print(_c(YELLOW, f"\n  â”€â”€â”€ Jornada {matchday} â”€â”€â”€"))
     for r in md_results:
         if r.home_goals > r.away_goals:
             score_color = GREEN
@@ -440,9 +657,9 @@ def print_matchday(results: list[MatchResult], matchday: int, team_filter: Optio
 
 
 def print_squad(team: Team):
-    print(_c(BOLD + YELLOW, f"\n  ═══ PLANTILLA: {team.name} ═══"))
+    print(_c(BOLD + YELLOW, f"\n  â•â•â• PLANTILLA: {team.name} â•â•â•"))
     print(_c(GRAY, f"  {'#':<3} {'JUGADOR':<26} {'POS':<18} {'ED':>3} {'ME':>3} {'VE':>3} {'RE':>3} {'CA':>3} {'VALOR':<12}"))
-    print(_c(GRAY, "  " + "─" * 78))
+    print(_c(GRAY, "  " + "â”€" * 78))
 
     sorted_players = sorted(team.players, key=lambda p: p.overall, reverse=True)
     for i, p in enumerate(sorted_players, 1):
@@ -463,9 +680,9 @@ def input_int(prompt: str, min_val: int, max_val: int) -> int:
             val = int(input(prompt).strip())
             if min_val <= val <= max_val:
                 return val
-            print(f"  Introduce un número entre {min_val} y {max_val}.")
+            print(f"  Introduce un nÃºmero entre {min_val} y {max_val}.")
         except ValueError:
-            print("  Número inválido.")
+            print("  NÃºmero invÃ¡lido.")
         except (EOFError, KeyboardInterrupt):
             sys.exit(0)
 
@@ -485,47 +702,47 @@ def select_team(teams_list: list[Team], prompt: str = "Elige equipo") -> Team:
 
 
 def menu_simulate_season(liga1: list[Team], liga2: list[Team]):
-    print(_c(BOLD + CYAN, "\n  ══════════════════════════════"))
+    print(_c(BOLD + CYAN, "\n  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
     print(_c(BOLD + CYAN,   "     SIMULAR TEMPORADA 2025/26"))
-    print(_c(BOLD + CYAN,   "  ══════════════════════════════"))
+    print(_c(BOLD + CYAN,   "  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
 
     seed = int.from_bytes(os.urandom(4), "little")
 
-    print(_c(YELLOW, "\n  Simulando LIGA1 (Primera División)..."))
+    print(_c(YELLOW, "\n  Simulando LIGA1 (Primera DivisiÃ³n)..."))
     liga1_standings, liga1_results = simulate_season(liga1, "LIGA1", seed)
 
-    print(_c(YELLOW, "  Simulando LIGA2 (Segunda División)..."))
+    print(_c(YELLOW, "  Simulando LIGA2 (Segunda DivisiÃ³n)..."))
     liga2_standings, liga2_results = simulate_season(liga2, "LIGA2", seed ^ 0xDEAD)
 
     # Ascensos/descensos
     relegated   = [s.team for s in liga1_standings[-3:]]
     promoted    = [s.team for s in liga2_standings[:3]]
 
-    print_standings(liga1_standings, "PRIMERA DIVISIÓN 2025/26", relegated_from=3)
-    print_standings(liga2_standings, "SEGUNDA DIVISIÓN 2025/26", promoted_to=3)
+    print_standings(liga1_standings, "PRIMERA DIVISIÃ“N 2025/26", relegated_from=3)
+    print_standings(liga2_standings, "SEGUNDA DIVISIÃ“N 2025/26", promoted_to=3)
 
     champion = liga1_standings[0]
-    print(_c(BOLD + GREEN, f"  🏆 CAMPEÓN: {champion.team.name} con {champion.points} puntos"))
+    print(_c(BOLD + GREEN, f"  ðŸ† CAMPEÃ“N: {champion.team.name} con {champion.points} puntos"))
 
-    print(_c(GREEN, "\n  ⬆ Ascienden a Primera:"))
+    print(_c(GREEN, "\n  â¬† Ascienden a Primera:"))
     for t in promoted:
-        print(f"    ✓ {t.name}")
+        print(f"    âœ“ {t.name}")
 
-    print(_c(RED, "\n  ⬇ Descienden a Segunda:"))
+    print(_c(RED, "\n  â¬‡ Descienden a Segunda:"))
     for t in relegated:
-        print(f"    ✗ {t.name}")
+        print(f"    âœ— {t.name}")
 
-    # Menú de resultados
+    # MenÃº de resultados
     while True:
-        print(_c(CYAN, "\n  ┌─ Ver resultados ────────────────┐"))
-        print(_c(CYAN, "  │ 1. Jornada específica LIGA1      │"))
-        print(_c(CYAN, "  │ 2. Jornada específica LIGA2      │"))
-        print(_c(CYAN, "  │ 3. Resultados de un equipo       │"))
-        print(_c(CYAN, "  │ 4. Plantilla de un equipo        │"))
-        print(_c(CYAN, "  │ 0. Volver                        │"))
-        print(_c(CYAN, "  └──────────────────────────────────┘"))
+        print(_c(CYAN, "\n  â”Œâ”€ Ver resultados â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”"))
+        print(_c(CYAN, "  â”‚ 1. Jornada especÃ­fica LIGA1      â”‚"))
+        print(_c(CYAN, "  â”‚ 2. Jornada especÃ­fica LIGA2      â”‚"))
+        print(_c(CYAN, "  â”‚ 3. Resultados de un equipo       â”‚"))
+        print(_c(CYAN, "  â”‚ 4. Plantilla de un equipo        â”‚"))
+        print(_c(CYAN, "  â”‚ 0. Volver                        â”‚"))
+        print(_c(CYAN, "  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜"))
 
-        op = input_int("  Opción: ", 0, 4)
+        op = input_int("  OpciÃ³n: ", 0, 4)
         if op == 0:
             break
         elif op == 1:
@@ -568,9 +785,9 @@ def menu_quick_match(liga1: list[Team], liga2: list[Team]):
     hg, ag = simulate_match(home, away, seed)
 
     print()
-    print(_c(BOLD + YELLOW, "  ══════════════════════════════"))
+    print(_c(BOLD + YELLOW, "  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
     print(_c(BOLD + YELLOW, "         RESULTADO FINAL"))
-    print(_c(BOLD + YELLOW, "  ══════════════════════════════"))
+    print(_c(BOLD + YELLOW, "  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
     print()
     if hg > ag:
         result_color = GREEN
@@ -595,14 +812,14 @@ def menu_top_players(liga1: list[Team], liga2: list[Team]):
         all_players.extend(t.players)
 
     print(_c(CYAN, "\n  Ordenar por:"))
-    print("    1. Valoración media (ME)")
+    print("    1. ValoraciÃ³n media (ME)")
     print("    2. Delanteros (remate)")
     print("    3. Porteros")
     print("    4. Defensas")
     print("    5. Centrocampistas (pase)")
 
-    op = input_int("  Opción (1-5): ", 1, 5)
-    n  = input_int("  ¿Cuántos jugadores? (5-50): ", 5, 50)
+    op = input_int("  OpciÃ³n (1-5): ", 1, 5)
+    n  = input_int("  Â¿CuÃ¡ntos jugadores? (5-50): ", 5, 50)
 
     if op == 1:
         top = sorted(all_players, key=lambda p: p.overall, reverse=True)[:n]
@@ -623,22 +840,22 @@ def menu_top_players(liga1: list[Team], liga2: list[Team]):
 
     print(_c(BOLD + YELLOW, f"\n  TOP {len(top)} JUGADORES"))
     print(_c(GRAY, f"  {'#':<3} {'JUGADOR':<26} {'EQUIPO':<22} {'POS':<18} {'ME':>3}"))
-    print(_c(GRAY, "  " + "─" * 74))
+    print(_c(GRAY, "  " + "â”€" * 74))
     for i, p in enumerate(top, 1):
         print(f"  {i:<3} {p.name[:25]:<26} {p.team_name[:21]:<22} {p.position[:17]:<18} {p.me:>3}")
     print()
 
 
 def menu_team_strength(liga1: list[Team], liga2: list[Team]):
-    print(_c(BOLD + YELLOW, "\n  ═══ RANKING DE FORTALEZA ═══"))
+    print(_c(BOLD + YELLOW, "\n  â•â•â• RANKING DE FORTALEZA â•â•â•"))
     all_teams = sorted(liga1 + liga2, key=lambda t: t.strength(), reverse=True)
 
     print(_c(GRAY, f"\n  {'#':>3}  {'EQUIPO':<26} {'LIGA':<8} {'FUERZA':>7}"))
-    print(_c(GRAY, "  " + "─" * 48))
+    print(_c(GRAY, "  " + "â”€" * 48))
     for i, t in enumerate(all_teams, 1):
-        comp = "1ª DIV" if t.comp == "ES1" else "2ª DIV"
+        comp = "1Âª DIV" if t.comp == "ES1" else "2Âª DIV"
         bar_len = int(t.strength() / 2)
-        bar = "█" * bar_len
+        bar = "â–ˆ" * bar_len
         if i <= 5:
             color = GREEN
         elif i > len(all_teams) - 5:
@@ -736,7 +953,7 @@ def menu_real_football() -> None:
         _pause()
 
 # ===========================================================================
-# PRO MANAGER — MODO CARRERA
+# PRO MANAGER â€” MODO CARRERA
 # ===========================================================================
 
 CAREER_SAVE = Path.home() / ".pcfutbol_career.json"
@@ -768,16 +985,16 @@ TRAINING_INTENSITY_LABELS = {
 
 TRAINING_FOCUS_LABELS = {
     "BALANCED": "Equilibrado",
-    "PHYSICAL": "FÃ­sico",
+    "PHYSICAL": "FÃƒÂ­sico",
     "DEFENSIVE": "Defensivo",
-    "TECHNICAL": "TÃ©cnico",
+    "TECHNICAL": "TÃƒÂ©cnico",
     "ATTACKING": "Ataque",
 }
 
 STAFF_LABELS = {
     "segundo_entrenador": "Segundo entrenador",
     "fisio": "Fisio",
-    "psicologo": "PsicÃ³logo",
+    "psicologo": "PsicÃƒÂ³logo",
     "asistente": "Asistente",
     "secretario": "Secretario",
     "ojeador": "Ojeador",
@@ -787,7 +1004,7 @@ STAFF_LABELS = {
 
 
 def _prestige_label(p: int) -> str:
-    return "★" * min(p, 5) + "☆" * (5 - min(p, 5))
+    return "â˜…" * min(p, 5) + "â˜†" * (5 - min(p, 5))
 
 
 def _pause():
@@ -835,7 +1052,7 @@ def _print_career_summary(data: dict):
         return
 
     print()
-    print(_c(BOLD + YELLOW, "  ═══ RESUMEN DE CARRERA ═══"))
+    print(_c(BOLD + YELLOW, "  â•â•â• RESUMEN DE CARRERA â•â•â•"))
     print(
         _c(
             GRAY,
@@ -850,10 +1067,10 @@ def _print_career_summary(data: dict):
         pos = h.get("position", "?")
         met = bool(h.get("met", False))
         if "Segunda" in comp and isinstance(pos, int) and pos <= 3:
-            outcome = "✓ ascenso"
+            outcome = "âœ“ ascenso"
         else:
-            outcome = "✓ objetivo" if met else "✗ objetivo"
-        comp_short = "1ª" if "Primera" in comp else ("2ª" if "Segunda" in comp else comp[:2])
+            outcome = "âœ“ objetivo" if met else "âœ— objetivo"
+        comp_short = "1Âª" if "Primera" in comp else ("2Âª" if "Segunda" in comp else comp[:2])
         print(f"  {season}: {team:<16} {comp_short:<2}  Pos {pos:<2}  {outcome}")
     print()
 
@@ -927,7 +1144,7 @@ def _training_plan_summary(training: dict) -> str:
     focus = str(training.get("focus", "BALANCED")).upper()
     i_label = TRAINING_INTENSITY_LABELS.get(intensity, intensity)
     f_label = TRAINING_FOCUS_LABELS.get(focus, focus)
-    return f"{i_label} · {f_label}"
+    return f"{i_label} Â· {f_label}"
 
 
 def _training_focus_attr_pool(focus: str, is_goalkeeper: bool) -> list[str]:
@@ -1023,9 +1240,15 @@ def _print_development_summary(summary: dict):
     declined = summary.get("declined", [])
     retired = summary.get("retired", [])
     youth_added = int(summary.get("youth_added", 0))
+    training_line = str(summary.get("training_line", "")).strip()
+    staff_line = str(summary.get("staff_line", "")).strip()
 
     print()
     print(_c(BOLD + YELLOW, "  ═══ EVOLUCION DE TU PLANTILLA ═══"))
+    if training_line:
+        print(f"  ENTRENAMIENTO: {training_line}")
+    if staff_line:
+        print(f"  STAFF CLAVE: {staff_line}")
     print(f"  MEJORAN:  {', '.join(improved[:4]) if improved else 'Sin cambios destacados'}")
     print(f"  BAJAN:    {', '.join(declined[:4]) if declined else 'Sin bajadas destacadas'}")
     print(f"  RETIRAN:  {', '.join(retired[:4]) if retired else 'Ningun jugador se retira'}")
@@ -1038,6 +1261,17 @@ def _apply_season_development(data: dict) -> dict:
     players = data.get("players", [])
     if not isinstance(players, list):
         return {"improved": [], "declined": [], "retired": [], "youth_added": 0}
+
+    _ensure_manager_depth(data)
+    manager = data.get("manager", {})
+    staff = manager.get("staff", {})
+    training = manager.get("training", {})
+    intensity = str(training.get("intensity", "MEDIUM")).upper()
+    focus = str(training.get("focus", "BALANCED")).upper()
+    segundo = _safe_int(staff.get("segundo_entrenador", 50), 50)
+    fisio = _safe_int(staff.get("fisio", 50), 50)
+    ojeador = _safe_int(staff.get("ojeador", 50), 50)
+    juveniles = _safe_int(staff.get("juveniles", 50), 50)
 
     season_str = str(data.get("season", "2025-26"))
     year = _season_year(season_str)
@@ -1058,6 +1292,7 @@ def _apply_season_development(data: dict) -> dict:
 
         birth_year = int(p.get("birth_year", year - 22))
         age = year - birth_year
+        is_goalkeeper = str(p.get("position", "")).lower().startswith("goal")
         is_manager_player = int(p.get("team_slot_id", -1)) == manager_slot
         before = {
             "me": int(p.get("me", 50)),
@@ -1077,21 +1312,59 @@ def _apply_season_development(data: dict) -> dict:
             continue
 
         if age < 24:
-            improve_count = rng.randint(1, 3)
+            base_count = rng.randint(1, 3)
+            intensity_adjust = 1 if intensity == "HIGH" else (-1 if intensity == "LOW" and base_count > 1 and rng.random() < 0.40 else 0)
+            coach_adjust = 1 if age <= 21 and segundo >= 70 else 0
+            improve_count = max(1, min(5, base_count + intensity_adjust + coach_adjust))
+            pool = _training_focus_attr_pool(focus, is_goalkeeper=is_goalkeeper)
+            weakest = sorted(attrs, key=lambda key: int(p.get(key, 50)))[:improve_count]
+            targets: list[str] = []
+            for attr in weakest:
+                if attr not in targets:
+                    targets.append(attr)
+            for attr in _pick_unique_attrs(rng, pool, improve_count + 1):
+                if attr not in targets:
+                    targets.append(attr)
+                if len(targets) >= improve_count:
+                    break
             gain = 0
-            for attr in rng.sample(attrs, k=improve_count):
-                inc = rng.randint(1, 3)
+            for attr in targets[:improve_count]:
+                intensity_bonus = 1 if intensity == "HIGH" and rng.random() < 0.55 else (1 if intensity == "MEDIUM" and rng.random() < 0.20 else 0)
+                coach_bonus = 1 if segundo >= 75 and rng.random() < 0.35 else 0
+                inc = min(4, rng.randint(1, 3) + intensity_bonus + coach_bonus)
                 p[attr] = min(99, int(p.get(attr, 50)) + inc)
                 gain += inc
-            p["me"] = min(99, int(p.get("me", 50)) + max(1, round(gain / max(1, improve_count))))
+            p["me"] = min(99, int(p.get("me", 50)) + max(1, round(gain / max(1, len(targets[:improve_count])))))
         elif age >= 31:
-            delta = 2 if age >= 34 else 1
-            p["ve"] = max(1, int(p.get("ve", 50)) - delta)
-            p["re"] = max(1, int(p.get("re", 50)) - delta)
-            p["me"] = max(1, int(p.get("me", 50)) - (1 if age >= 34 else 0))
+            decline = 2 if age >= 34 else 1
+            if intensity == "HIGH" and age >= 33:
+                decline += 1
+            if fisio >= 85:
+                decline -= 1
+            elif fisio >= 65 and age >= 34:
+                decline -= 1
+            decline = max(0, decline)
+            if decline > 0:
+                p["ve"] = max(1, int(p.get("ve", 50)) - decline)
+                p["re"] = max(1, int(p.get("re", 50)) - decline)
+            if decline > 0 and intensity == "HIGH" and fisio < 40 and age >= 34 and rng.random() < 0.35:
+                p["ag"] = max(0, int(p.get("ag", 50)) - 1)
+            p["me"] = max(1, int(p.get("me", 50)) - (1 if decline >= 2 else 0))
         else:
-            for attr in rng.sample(attrs, k=rng.randint(0, 2)):
-                p[attr] = max(0, min(99, int(p.get(attr, 50)) + rng.randint(-1, 1)))
+            adjust_count = rng.randint(0, 2)
+            if intensity == "HIGH" and rng.random() < 0.35:
+                adjust_count = min(3, adjust_count + 1)
+            elif intensity == "LOW" and adjust_count > 0 and rng.random() < 0.35:
+                adjust_count -= 1
+            prime_pool = _training_focus_attr_pool(focus, is_goalkeeper=is_goalkeeper)
+            focus_attrs = set(_training_focus_attr_pool(focus, is_goalkeeper=is_goalkeeper))
+            for attr in _pick_unique_attrs(rng, prime_pool, adjust_count):
+                delta = rng.randint(-1, 1)
+                if delta > 0 and focus != "BALANCED" and attr in focus_attrs and rng.random() < 0.45:
+                    delta += 1
+                if delta < 0 and segundo >= 75 and rng.random() < 0.40:
+                    delta += 1
+                p[attr] = max(0, min(99, int(p.get(attr, 50)) + delta))
             p["me"] = max(1, min(99, int(p.get("me", 50)) + rng.randint(-1, 1)))
 
         if not is_manager_player:
@@ -1118,25 +1391,77 @@ def _apply_season_development(data: dict) -> dict:
 
     youth_added = 0
     if manager_slot > 0:
-        for _ in range(2):
+        youth_count = 2 + (1 if juveniles >= 85 and ojeador >= 70 else 0)
+        floor_bonus = min(6, juveniles // 20 + ojeador // 30)
+        consistency = min(3, segundo // 30)
+        for _ in range(youth_count):
+            position = _pick_youth_position(rng, ojeador)
+            is_goalkeeper = position == "Goalkeeper"
+            ve = _sample_attr(rng, 35, 50, floor_bonus=floor_bonus, consistency=consistency)
+            re = _sample_attr(rng, 35, 50, floor_bonus=floor_bonus, consistency=consistency)
+            ag = _sample_attr(rng, 30, 55, floor_bonus=max(0, floor_bonus - 1), consistency=consistency)
+            ca = _sample_attr(rng, 35, 55, floor_bonus=floor_bonus, consistency=consistency)
+            remate = _sample_attr(
+                rng,
+                5 if is_goalkeeper else 20,
+                25 if is_goalkeeper else 45,
+                floor_bonus=max(0, floor_bonus - (2 if is_goalkeeper else 0)),
+                consistency=consistency,
+            )
+            regate = _sample_attr(
+                rng,
+                5 if is_goalkeeper else 20,
+                25 if is_goalkeeper else 45,
+                floor_bonus=max(0, floor_bonus - (2 if is_goalkeeper else 0)),
+                consistency=consistency,
+            )
+            pase = _sample_attr(
+                rng,
+                10 if is_goalkeeper else 25,
+                30 if is_goalkeeper else 50,
+                floor_bonus=max(0, floor_bonus - (1 if is_goalkeeper else 0)),
+                consistency=consistency,
+            )
+            tiro = _sample_attr(
+                rng,
+                5 if is_goalkeeper else 20,
+                20 if is_goalkeeper else 45,
+                floor_bonus=max(0, floor_bonus - (2 if is_goalkeeper else 0)),
+                consistency=consistency,
+            )
+            entrada = _sample_attr(
+                rng,
+                10 if is_goalkeeper else 25,
+                30 if is_goalkeeper else 50,
+                floor_bonus=max(0, floor_bonus - (1 if is_goalkeeper else 0)),
+                consistency=consistency,
+            )
+            portero = _sample_attr(
+                rng,
+                35 if is_goalkeeper else 0,
+                55 if is_goalkeeper else 0,
+                floor_bonus=floor_bonus if is_goalkeeper else 0,
+                consistency=consistency,
+            )
+            quality_hint = (ca + pase + regate + remate + tiro) // 5
             players.append({
                 "name": f"Cantera {rng.randint(100, 999)}",
-                "position": rng.choice(["Defender", "Midfielder", "Forward"]),
+                "position": position,
                 "birth_year": year - 17,
-                "me": rng.randint(42, 55),
-                "ve": rng.randint(35, 50),
-                "re": rng.randint(35, 50),
-                "ag": rng.randint(30, 55),
-                "ca": rng.randint(35, 55),
-                "remate": rng.randint(20, 45),
-                "regate": rng.randint(20, 45),
-                "pase": rng.randint(25, 50),
-                "tiro": rng.randint(20, 45),
-                "entrada": rng.randint(25, 50),
-                "portero": 0,
+                "me": max(40, min(70, quality_hint + 8)),
+                "ve": ve,
+                "re": re,
+                "ag": ag,
+                "ca": ca,
+                "remate": remate,
+                "regate": regate,
+                "pase": pase,
+                "tiro": tiro,
+                "entrada": entrada,
+                "portero": portero if is_goalkeeper else 0,
                 "team_slot_id": manager_slot,
                 "status": "OK",
-                "market_value": rng.randint(100_000, 600_000),
+                "market_value": max(100_000, min(1_200_000, quality_hint * 18_000)),
             })
             youth_added += 1
 
@@ -1148,6 +1473,8 @@ def _apply_season_development(data: dict) -> dict:
         "declined": declined,
         "retired": retired,
         "youth_added": youth_added,
+        "training_line": _training_plan_summary(training),
+        "staff_line": f"2o {segundo} · Fisio {fisio} · Ojeador {ojeador} · Juveniles {juveniles}",
     }
 
 
@@ -1208,10 +1535,10 @@ def _generate_offers(prestige: int, liga1: list[Team], liga2: list[Team], liga_r
         else:
             pool = l1[:16]
     elif prestige <= 7:
-        # Primera División española + ligas top extranjeras (más débiles)
+        # Primera DivisiÃ³n espaÃ±ola + ligas top extranjeras (mÃ¡s dÃ©biles)
         pool = list(l1) + l_foreign[:10]
     elif prestige <= 9:
-        # Mezcla de Primera española y todas las ligas extranjeras
+        # Mezcla de Primera espaÃ±ola y todas las ligas extranjeras
         pool = l1[-10:] + l_foreign
     else:
         # Prestige 10: solo las mejores ligas extranjeras + cima de la Primera
@@ -1280,7 +1607,7 @@ def _check_objective(objective: str, position: int, total: int, comp: str) -> bo
 def _pm_header(data: dict, matchday: int, total_md: int):
     m = data["manager"]
     print()
-    print(_c(BOLD + CYAN, f"  ═══ PROMANAGER · TEMPORADA {data['season']} ═══"))
+    print(_c(BOLD + CYAN, f"  â•â•â• PROMANAGER Â· TEMPORADA {data['season']} â•â•â•"))
     print(_c(YELLOW, f"  Manager : {m['name']:<20}  Prestigio: {_prestige_label(m['prestige'])}"))
     print(_c(YELLOW, f"  Equipo  : {data['team_name']:<20}  Jornada  : {matchday}/{total_md}"))
     print(_c(CYAN,   f"  Objetivo: {data['objective']}"))
@@ -1302,7 +1629,7 @@ def _mini_standings(standings: list[Standing], mgr_slot: int, n_rel: int):
         if prev >= 0 and pos > prev + 1:
             print(_c(GRAY, "        ..."))
         if pos == total - n_rel:
-            print(_c(RED, "       ─── zona de descenso ──"))
+            print(_c(RED, "       â”€â”€â”€ zona de descenso â”€â”€"))
         s   = standings[pos]
         mgr = s.team.slot_id == mgr_slot
         if pos == 0:             color = GREEN
@@ -1310,20 +1637,20 @@ def _mini_standings(standings: list[Standing], mgr_slot: int, n_rel: int):
         elif mgr:                color = YELLOW
         else:                    color = RESET
         print(color + f"  {pos+1:>3}  {s.team.name[:23]:<24} {s.played:>3} {s.points:>4}" +
-              (" ◄" if mgr else "") + RESET)
+              (" â—„" if mgr else "") + RESET)
         prev = pos
     print()
 
 
 def _show_md_results(md_res: list[dict], tbs: dict[int, Team], mgr_slot: int):
-    print(_c(YELLOW, "  ─── RESULTADOS ─────────────────────"))
+    print(_c(YELLOW, "  â”€â”€â”€ RESULTADOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€"))
     for r in md_res:
         ht = tbs.get(r["h"]); at = tbs.get(r["a"])
         if not ht or not at:
             continue
         hg, ag  = r["hg"], r["ag"]
         is_mgr  = r["h"] == mgr_slot or r["a"] == mgr_slot
-        row     = f"  {'▶' if is_mgr else ' '} {ht.name[:21]:<22} {hg:>2} - {ag:<2} {at.name}"
+        row     = f"  {'â–¶' if is_mgr else ' '} {ht.name[:21]:<22} {hg:>2} - {ag:<2} {at.name}"
         if is_mgr:
             won  = (r["h"] == mgr_slot and hg > ag) or (r["a"] == mgr_slot and ag > hg)
             color = GREEN if won else (GRAY if hg == ag else RED)
@@ -1348,10 +1675,10 @@ def _news_item(r: dict, tbs: dict[int, Team], mgr_slot: int,
             f"Tres puntos {venue}. {mgr_name} vence a {oname} y sube posiciones.",
         ])
     elif mg == og:
-        extra = " Sigue en zona de descenso." if drop else f" El equipo es {pos}º."
+        extra = " Sigue en zona de descenso." if drop else f" El equipo es {pos}Âº."
         return f"Empate {venue} ante {oname} ({mg}-{mg}).{extra}"
     else:
-        extra = " La junta convoca urgencia." if drop else f" Posición {pos}."
+        extra = " La junta convoca urgencia." if drop else f" PosiciÃ³n {pos}."
         return f"Derrota {venue} ante {oname} ({mg}-{og}).{extra}"
 
 
@@ -1398,18 +1725,18 @@ def _append_dynamic_news(
 
     if mgr_pos:
         if mgr_pos <= max(3, total // 4):
-            candidates.append(f"La junta esta satisfecha con tu rendimiento (pos {mgr_pos}ª).")
+            candidates.append(f"La junta esta satisfecha con tu rendimiento (pos {mgr_pos}Âª).")
         elif mgr_pos > total - n_rel:
-            candidates.append(f"La junta exige reaccion inmediata (pos {mgr_pos}ª).")
+            candidates.append(f"La junta exige reaccion inmediata (pos {mgr_pos}Âª).")
         else:
-            candidates.append(f"La junta mantiene la calma con tu rendimiento (pos {mgr_pos}ª).")
+            candidates.append(f"La junta mantiene la calma con tu rendimiento (pos {mgr_pos}Âª).")
 
     rivals = [t for sid, t in tbs.items() if sid != mgr_slot]
     if rivals:
         rival = rng.choice(rivals)
         fichaje = _pick_player_name(rival, rng, prefer_attack=True)
         fee = rng.randint(1, 8)
-        candidates.append(f"Rival {rival.name} acaba de fichar a {fichaje} por {fee}M€.")
+        candidates.append(f"Rival {rival.name} acaba de fichar a {fichaje} por {fee}Mâ‚¬.")
 
     unique: list[str] = []
     seen: set[str] = set()
@@ -1438,42 +1765,42 @@ def _season_end_screen(data: dict, standings: list[Standing], mgr_slot: int,
     mgr_st    = next((s for s in standings if s.team.slot_id == mgr_slot), None)
 
     print()
-    print(_c(BOLD + YELLOW, "  ╔═══════════════════════════════════╗"))
-    print(_c(BOLD + YELLOW, "  ║        FIN DE TEMPORADA           ║"))
-    print(_c(BOLD + YELLOW, "  ╚═══════════════════════════════════╝"))
+    print(_c(BOLD + YELLOW, "  â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"))
+    print(_c(BOLD + YELLOW, "  â•‘        FIN DE TEMPORADA           â•‘"))
+    print(_c(BOLD + YELLOW, "  â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
     print()
-    print(_c(GREEN, f"  🏆 CAMPEÓN: {standings[0].team.name} ({standings[0].points} pts)"))
+    print(_c(GREEN, f"  ðŸ† CAMPEÃ“N: {standings[0].team.name} ({standings[0].points} pts)"))
     print()
-    print(_c(YELLOW, f"  TU RESULTADO — {mgr_team.name}"))
+    print(_c(YELLOW, f"  TU RESULTADO â€” {mgr_team.name}"))
     if mgr_st:
-        print(f"  Posición: {mgr_pos}º / {total}")
+        print(f"  PosiciÃ³n: {mgr_pos}Âº / {total}")
         print(f"  PJ:{mgr_st.played}  G-E-P: {mgr_st.won}-{mgr_st.drawn}-{mgr_st.lost}  "
               f"GF:{mgr_st.gf}  GC:{mgr_st.ga}  DG:{mgr_st.gd:+d}  PTS:{mgr_st.points}")
     print()
     print(f"  Objetivo: {data['objective']}")
     if met:
-        print(_c(GREEN, "  ✓  OBJETIVO CUMPLIDO"))
+        print(_c(GREEN, "  âœ“  OBJETIVO CUMPLIDO"))
     else:
-        print(_c(RED,   "  ✗  OBJETIVO NO CUMPLIDO"))
+        print(_c(RED,   "  âœ—  OBJETIVO NO CUMPLIDO"))
 
     rel_teams = [standings[total - n_rel + i].team for i in range(n_rel)]
     if mgr_team in rel_teams:
-        print(_c(RED,   f"\n  ⬇  {mgr_team.name} DESCIENDE de {comp_name}"))
+        print(_c(RED,   f"\n  â¬‡  {mgr_team.name} DESCIENDE de {comp_name}"))
     elif not is_l1 and mgr_pos <= 3:
         comp_key = data.get("competition", "ES2")
         if comp_key == "ES2":
-            print(_c(GREEN, f"\n  ⬆  {mgr_team.name} ASCIENDE a Primera División"))
+            print(_c(GREEN, f"\n  â¬†  {mgr_team.name} ASCIENDE a Primera DivisiÃ³n"))
         elif comp_key in ("E3G1", "E3G2"):
-            print(_c(GREEN, f"\n  ⬆  {mgr_team.name} ASCIENDE a Segunda División"))
+            print(_c(GREEN, f"\n  â¬†  {mgr_team.name} ASCIENDE a Segunda DivisiÃ³n"))
         else:
-            print(_c(GREEN, f"\n  ⬆  {mgr_team.name} — ASCENSO clasificado"))
+            print(_c(GREEN, f"\n  â¬†  {mgr_team.name} â€” ASCENSO clasificado"))
 
     old_p = data["manager"]["prestige"]
     new_p = min(10, old_p + 1) if met else max(1, old_p - 1)
     print()
-    print(_c(CYAN, f"  Prestigio: {_prestige_label(old_p)}  →  {_prestige_label(new_p)}"))
+    print(_c(CYAN, f"  Prestigio: {_prestige_label(old_p)}  â†’  {_prestige_label(new_p)}"))
     print()
-    print_standings(standings, f"{comp_name} — {data['season']}", relegated_from=n_rel)
+    print_standings(standings, f"{comp_name} â€” {data['season']}", relegated_from=n_rel)
 
     data["manager"]["prestige"]      = new_p
     data["manager"]["total_seasons"] += 1
@@ -1524,28 +1851,28 @@ def _tactic_summary(t: dict) -> str:
     tj = _TACTIC_LABELS["tipoJuego"].get(t.get("tipoJuego", 2), "?")
     tm = _TACTIC_LABELS["tipoMarcaje"].get(t.get("tipoMarcaje", 1), "?")
     tp = _TACTIC_LABELS["tipoPresion"].get(t.get("tipoPresion", 2), "?")
-    pt = "  [PÉRD.TIEMPO]" if t.get("perdidaTiempo", 0) == 1 else ""
-    return f"{tj} · {tm} · Presión {tp} · Toque {t.get('porcToque',50)}% · Contra {t.get('porcContra',30)}%{pt}"
+    pt = "  [PÃ‰RD.TIEMPO]" if t.get("perdidaTiempo", 0) == 1 else ""
+    return f"{tj} Â· {tm} Â· PresiÃ³n {tp} Â· Toque {t.get('porcToque',50)}% Â· Contra {t.get('porcContra',30)}%{pt}"
 
 
 def _tactic_menu(data: dict):
     t = data.setdefault("tactic", dict(DEFAULT_TACTIC))
-    print(_c(BOLD + YELLOW, "\n  ═══ TÁCTICA ═══"))
+    print(_c(BOLD + YELLOW, "\n  â•â•â• TÃCTICA â•â•â•"))
 
     while True:
-        print(_c(GRAY, f"\n  Ajuste táctico actual: {_tactic_adj(t):+.1f}"))
+        print(_c(GRAY, f"\n  Ajuste tÃ¡ctico actual: {_tactic_adj(t, is_home=False):+.1f}"))
         print(f"  1. Tipo de juego    : {_c(CYAN, _TACTIC_LABELS['tipoJuego'][t['tipoJuego']])}")
         print(f"  2. Marcaje          : {_c(CYAN, _TACTIC_LABELS['tipoMarcaje'][t['tipoMarcaje']])}")
-        print(f"  3. Presión          : {_c(CYAN, _TACTIC_LABELS['tipoPresion'][t['tipoPresion']])}")
+        print(f"  3. PresiÃ³n          : {_c(CYAN, _TACTIC_LABELS['tipoPresion'][t['tipoPresion']])}")
         print(f"  4. Despejes         : {_c(CYAN, _TACTIC_LABELS['tipoDespejes'][t['tipoDespejes']])}")
         print(f"  5. Faltas           : {_c(CYAN, _TACTIC_LABELS['faltas'][t['faltas']])}")
         print(f"  6. % Toque          : {_c(CYAN, str(t['porcToque']))}%")
         print(f"  7. % Contragolpe    : {_c(CYAN, str(t['porcContra']))}%")
         pt_lbl = _c(YELLOW, "ACTIVA") if t.get("perdidaTiempo", 0) == 1 else _c(GRAY, "NO")
-        print(f"  8. Pérdida de tiempo: {pt_lbl}  {_c(GRAY, '(más amarillas · +tiempo añadido)')}")
+        print(f"  8. PÃ©rdida de tiempo: {pt_lbl}  {_c(GRAY, '(mÃ¡s amarillas Â· +tiempo aÃ±adido)')}")
         print(_c(CYAN, "  0. Volver"))
 
-        op = input_int("  Opción: ", 0, 8)
+        op = input_int("  OpciÃ³n: ", 0, 8)
         if op == 0:
             _save_career(data)
             break
@@ -1572,35 +1899,74 @@ def _tactic_menu(data: dict):
             t["perdidaTiempo"] = 1 - t.get("perdidaTiempo", 0)  # toggle
 
 
+def _manager_depth_menu(data: dict):
+    _ensure_manager_depth(data)
+    manager = data.setdefault("manager", {})
+    training = manager.setdefault("training", dict(DEFAULT_TRAINING_PLAN))
+    staff = manager.setdefault("staff", dict(DEFAULT_STAFF_PROFILE))
+    staff_keys = list(DEFAULT_STAFF_PROFILE.keys())
+
+    while True:
+        print(_c(BOLD + YELLOW, "\n  ═══ ENTRENAMIENTO Y STAFF ═══"))
+        print(f"  Plan actual: {_training_plan_summary(training)}")
+        print(f"  1. Intensidad: {_c(CYAN, TRAINING_INTENSITY_LABELS.get(training['intensity'], training['intensity']))}")
+        print(f"  2. Enfoque   : {_c(CYAN, TRAINING_FOCUS_LABELS.get(training['focus'], training['focus']))}")
+        print()
+        for idx, key in enumerate(staff_keys, 3):
+            print(f"  {idx}. {STAFF_LABELS.get(key, key):<18} {_c(CYAN, str(staff.get(key, 50)))}")
+        print(_c(CYAN, "  0. Volver"))
+
+        op = input_int("  Opcion: ", 0, 2 + len(staff_keys))
+        if op == 0:
+            _save_career(data)
+            return
+        if op == 1:
+            print("    1.Suave  2.Media  3.Alta")
+            selected = input_int("  Elige (1-3): ", 1, 3)
+            training["intensity"] = TRAINING_INTENSITIES[selected - 1]
+            continue
+        if op == 2:
+            print("    1.Equilibrado  2.Fisico  3.Defensivo  4.Tecnico  5.Ataque")
+            selected = input_int("  Elige (1-5): ", 1, 5)
+            training["focus"] = TRAINING_FOCUSES[selected - 1]
+            continue
+        staff_idx = op - 3
+        if 0 <= staff_idx < len(staff_keys):
+            key = staff_keys[staff_idx]
+            current = _safe_int(staff.get(key, 50), 50)
+            print(f"  {STAFF_LABELS.get(key, key)} actual: {current}")
+            staff[key] = input_int("  Nuevo nivel (0-100): ", 0, 100)
+
+
 # ---------------------------------------------------------------------------
-# Modo Entrenador — animated pitch view
+# Modo Entrenador â€” animated pitch view
 # ---------------------------------------------------------------------------
 
 _COMM_ATT = [
     "Disparo que sale desviado.",
-    "Fuera de juego — el juego continúa.",
-    "Córner. El portero atrapa el balón.",
+    "Fuera de juego â€” el juego continÃºa.",
+    "CÃ³rner. El portero atrapa el balÃ³n.",
     "Remate de cabeza al larguero.",
     "Gran parada del portero.",
     "Falta peligrosa desde la frontal.",
-    "Balón en el área pero sin rematador.",
-    "El delantero controla y dispara — fuera.",
+    "BalÃ³n en el Ã¡rea pero sin rematador.",
+    "El delantero controla y dispara â€” fuera.",
 ]
 
 _COMM_MID = [
     "El juego se detiene por una falta.",
-    "Duelo físico en el centro del campo.",
-    "La afición anima a su equipo.",
-    "Balón dividido cerca del área central.",
-    "El árbitro pita falta.",
+    "Duelo fÃ­sico en el centro del campo.",
+    "La aficiÃ³n anima a su equipo.",
+    "BalÃ³n dividido cerca del Ã¡rea central.",
+    "El Ã¡rbitro pita falta.",
     "Ritmo de partido alto.",
     "Intercambio de posiciones en el centro.",
-    "El balón recorre el campo de lado a lado.",
+    "El balÃ³n recorre el campo de lado a lado.",
 ]
 
 
 def _squad_rows(players: list["Player"]):
-    """Split squad into GK / DEF / MID / ATT for pitch display (≤4 each)."""
+    """Split squad into GK / DEF / MID / ATT for pitch display (â‰¤4 each)."""
     gk = [p for p in players if p.is_goalkeeper]
     df = [p for p in players if not p.is_goalkeeper and
           ("Back" in p.position or
@@ -1631,20 +1997,20 @@ def _draw_frame(
     opp_sc = ag if is_home_mgr else hg
     sc     = GREEN if mgr_sc > opp_sc else (RED if mgr_sc < opp_sc else CYAN)
     if isinstance(minute, int):
-        phase   = "1ª" if minute <= 45 else "2ª"
+        phase   = "1Âª" if minute <= 45 else "2Âª"
         min_str = f"{minute:02d}'"
     else:
-        phase   = "2ª" if str(minute).startswith("90") else "1ª"
+        phase   = "2Âª" if str(minute).startswith("90") else "1Âª"
         min_str = str(minute)
     score  = f"{hg}-{ag}" if is_home_mgr else f"{ag}-{hg}"
 
     os.system("cls" if os.name == "nt" else "clear")
 
-    BALL = "⚽"
+    BALL = "âš½"
 
     def tokens(players, n=4):
         ts = [f"[{p.name.split()[-1][:4]:^4}]" for p in players[:n]]
-        return "  ".join(ts) if ts else "[   —   ]"
+        return "  ".join(ts) if ts else "[   â€”   ]"
 
     def prow(players, color, n=4, ball=False):
         bm = f" {BALL} " if ball else "   "
@@ -1653,38 +2019,38 @@ def _draw_frame(
     def gkrow(gk_list, color, ball=False):
         nm = gk_list[0].name.split()[-1][:8] if gk_list else "---"
         bm = f" {BALL} " if ball else "   "
-        print(f"   {bm}{_c(color, f'[ GK · {nm} ]')}")
+        print(f"   {bm}{_c(color, f'[ GK Â· {nm} ]')}")
 
     print()
-    print(_c(BOLD + CYAN, f"  {'═'*52}"))
+    print(_c(BOLD + CYAN, f"  {'â•'*52}"))
     print(f"  {home.name[:18]:<18}  {phase} {min_str}  {_c(sc+BOLD, score)}  {away.name[:18]}")
-    print(_c(BOLD + CYAN, f"  {'═'*52}"))
+    print(_c(BOLD + CYAN, f"  {'â•'*52}"))
     print()
 
-    # ── Opponent half (top) ──
+    # â”€â”€ Opponent half (top) â”€â”€
     gkrow(opp_gk, GRAY,   ball=(ball_zone == 0))
     prow (opp_df, GRAY,   ball=(ball_zone == 1))
     prow (opp_md, GRAY,   ball=False)
     prow (opp_at, GRAY,   ball=(ball_zone == 2))
     print()
 
-    # ── Centre line ──
-    ml   = list("· " * 24)
+    # â”€â”€ Centre line â”€â”€
+    ml   = list("Â· " * 24)
     if ball_zone == 2:
         ml[len(ml)//2] = BALL
     print(_c(GRAY, f"   {''.join(ml)[:48]}"))
     print()
 
-    # ── Manager half (bottom) ──
+    # â”€â”€ Manager half (bottom) â”€â”€
     prow (mgr_at, YELLOW, ball=(ball_zone == 2))
     prow (mgr_md, YELLOW, ball=False)
     prow (mgr_df, YELLOW, ball=(ball_zone == 3))
     gkrow(mgr_gk, YELLOW, ball=(ball_zone == 4))
     print()
 
-    print(_c(BOLD + CYAN,   f"  {'═'*52}"))
-    print(_c(YELLOW + BOLD, f"  ► {mgr.name}"))
-    print(_c(BOLD + CYAN,   f"  {'═'*52}"))
+    print(_c(BOLD + CYAN,   f"  {'â•'*52}"))
+    print(_c(YELLOW + BOLD, f"  â–º {mgr.name}"))
+    print(_c(BOLD + CYAN,   f"  {'â•'*52}"))
 
     if message:
         print()
@@ -1710,11 +2076,11 @@ def _entrenador_substitution(mgr_team: "Team", subs_made: list) -> bool:
     if len(squad) < 2:
         print(_c(GRAY, "  No hay suficientes jugadores.\n"))
         return False
-    print(_c(YELLOW + BOLD, "\n  ── SUSTITUCIÓN ──"))
-    print(_c(GRAY, f"  {'#':>3}  {'JUGADOR':<26} {'POSICIÓN':<18} {'ME':>3}"))
-    print(_c(GRAY, "  " + "─" * 52))
+    print(_c(YELLOW + BOLD, "\n  â”€â”€ SUSTITUCIÃ“N â”€â”€"))
+    print(_c(GRAY, f"  {'#':>3}  {'JUGADOR':<26} {'POSICIÃ“N':<18} {'ME':>3}"))
+    print(_c(GRAY, "  " + "â”€" * 52))
     for i, p in enumerate(squad, 1):
-        tag = _c(RED, " ·sale·") if p.name in subs_made else ""
+        tag = _c(RED, " Â·saleÂ·") if p.name in subs_made else ""
         print(f"  {i:>3}  {p.name[:25]:<26} {p.position[:17]:<18} {p.me:>3}{tag}")
     print()
     out_i = input_int(f"  Sale  (1-{len(squad)}, 0=cancelar): ", 0, len(squad))
@@ -1724,7 +2090,7 @@ def _entrenador_substitution(mgr_team: "Team", subs_made: list) -> bool:
     if in_i == 0 or in_i == out_i:
         return False
     subs_made.append(squad[out_i - 1].name)
-    print(_c(GREEN, f"  ✓ Sale {squad[out_i-1].name}  →  Entra {squad[in_i-1].name}\n"))
+    print(_c(GREEN, f"  âœ“ Sale {squad[out_i-1].name}  â†’  Entra {squad[in_i-1].name}\n"))
     return True
 
 
@@ -1987,7 +2353,7 @@ def _match_entrenador(
         time.sleep(0.7)
 
     def minute_strengths() -> tuple[float, float, float]:
-        our_adj = _tactic_adj(tactic_ref[0])
+        our_adj = _tactic_adj(tactic_ref[0], is_home=False)
 
         tempo = 1.0
         if calm_boost[0] > 0:
@@ -2214,7 +2580,7 @@ def _market_buy(data: dict, mgr_team: Team, all_slots: dict[int, Team],
         if p.name not in mgr_names
     ]
 
-    print(_c(CYAN, "\n  Filtrar por posición: 1.Todos  2.Porteros  3.Defensas  4.Medios  5.Delanteros"))
+    print(_c(CYAN, "\n  Filtrar por posiciÃ³n: 1.Todos  2.Porteros  3.Defensas  4.Medios  5.Delanteros"))
     pf = input_int("  Filtro (1-5): ", 1, 5)
     filters = {
         2: lambda p: p.is_goalkeeper,
@@ -2235,11 +2601,11 @@ def _market_buy(data: dict, mgr_team: Team, all_slots: dict[int, Team],
         print(_c(GRAY, "  No hay jugadores disponibles.\n"))
         return
 
-    print(_c(BOLD + YELLOW, f"\n  Jugadores disponibles (presupuesto: €{budget:,.0f})"))
+    print(_c(BOLD + YELLOW, f"\n  Jugadores disponibles (presupuesto: â‚¬{budget:,.0f})"))
     print(_c(GRAY, f"  {'#':>3}  {'JUGADOR':<24} {'EQUIPO':<22} {'ME':>3} {'VALOR':<12}"))
-    print(_c(GRAY, "  " + "─" * 68))
+    print(_c(GRAY, "  " + "â”€" * 68))
     for i, (t, p) in enumerate(candidates, 1):
-        val   = f"€{p.market_value/1e6:.1f}M" if p.market_value >= 1e6 else f"€{p.market_value//1000}K"
+        val   = f"â‚¬{p.market_value/1e6:.1f}M" if p.market_value >= 1e6 else f"â‚¬{p.market_value//1000}K"
         color = RESET if p.market_value <= budget else GRAY
         print(color + f"  {i:>3}  {p.name[:23]:<24} {t.name[:21]:<22} {p.me:>3} {val}" + RESET)
     print()
@@ -2250,9 +2616,9 @@ def _market_buy(data: dict, mgr_team: Team, all_slots: dict[int, Team],
     src_team, player = candidates[idx - 1]
     fee = player.market_value
     if fee > budget:
-        print(_c(RED, f"  Sin presupuesto (necesitas €{fee:,.0f}, tienes €{budget:,.0f}).\n"))
+        print(_c(RED, f"  Sin presupuesto (necesitas â‚¬{fee:,.0f}, tienes â‚¬{budget:,.0f}).\n"))
         return
-    print(_c(YELLOW, f"\n  Fichar {player.name} de {src_team.name} por €{fee:,.0f}?"))
+    print(_c(YELLOW, f"\n  Fichar {player.name} de {src_team.name} por â‚¬{fee:,.0f}?"))
     if input_int("  1.Confirmar  0.Cancelar: ", 0, 1) == 0:
         return
     data["budget"] = budget - fee
@@ -2260,20 +2626,20 @@ def _market_buy(data: dict, mgr_team: Team, all_slots: dict[int, Team],
     src_team.players  = [p for p in src_team.players if p.name != player.name]
     mgr_team.players.append(player)
     _save_career(data)
-    print(_c(GREEN, f"  ✓ {player.name} fichado. Presupuesto restante: €{data['budget']:,.0f}\n"))
+    print(_c(GREEN, f"  âœ“ {player.name} fichado. Presupuesto restante: â‚¬{data['budget']:,.0f}\n"))
 
 
 def _market_sell(data: dict, mgr_team: Team):
     if not mgr_team.players:
-        print(_c(GRAY, "  Plantilla vacía.\n"))
+        print(_c(GRAY, "  Plantilla vacÃ­a.\n"))
         return
     spl = sorted(mgr_team.players, key=lambda p: p.overall, reverse=True)
     print(_c(BOLD + YELLOW, "\n  Vender jugador:"))
     print(_c(GRAY, f"  {'#':>3}  {'JUGADOR':<26} {'POS':<18} {'ME':>3}  VENTA(60%)"))
-    print(_c(GRAY, "  " + "─" * 64))
+    print(_c(GRAY, "  " + "â”€" * 64))
     for i, p in enumerate(spl, 1):
         sale = int(p.market_value * 0.6)
-        val  = f"€{sale/1e6:.1f}M" if sale >= 1e6 else f"€{sale//1000}K"
+        val  = f"â‚¬{sale/1e6:.1f}M" if sale >= 1e6 else f"â‚¬{sale//1000}K"
         print(f"  {i:>3}  {p.name[:25]:<26} {p.position[:17]:<18} {p.me:>3}  {val}")
     print()
     idx = input_int(f"  Vender (1-{len(spl)}, 0=cancelar): ", 0, len(spl))
@@ -2281,14 +2647,14 @@ def _market_sell(data: dict, mgr_team: Team):
         return
     player = spl[idx - 1]
     sale   = int(player.market_value * 0.6)
-    print(_c(YELLOW, f"\n  Vender {player.name} por €{sale:,.0f}?"))
+    print(_c(YELLOW, f"\n  Vender {player.name} por â‚¬{sale:,.0f}?"))
     if input_int("  1.Confirmar  0.Cancelar: ", 0, 1) == 0:
         return
     data["budget"] = data.get("budget", 0) + sale
     data.setdefault("sold", []).append(player.name)
     mgr_team.players = [p for p in mgr_team.players if p.name != player.name]
     _save_career(data)
-    print(_c(GREEN, f"  ✓ {player.name} vendido. Presupuesto: €{data['budget']:,.0f}\n"))
+    print(_c(GREEN, f"  âœ“ {player.name} vendido. Presupuesto: â‚¬{data['budget']:,.0f}\n"))
 
 
 def _market_menu(data: dict, mgr_team: Team, all_slots: dict[int, Team],
@@ -2299,15 +2665,15 @@ def _market_menu(data: dict, mgr_team: Team, all_slots: dict[int, Team],
     budget   = data.get("budget", 0)
     status   = _c(GREEN, "ABIERTA") if window else _c(RED, "CERRADA")
 
-    print(_c(BOLD + YELLOW, "\n  ═══ MERCADO DE FICHAJES ═══"))
-    print(f"  {mgr_team.name}   |   Presupuesto: €{budget:,.0f}   |   Ventana: {status}")
+    print(_c(BOLD + YELLOW, "\n  â•â•â• MERCADO DE FICHAJES â•â•â•"))
+    print(f"  {mgr_team.name}   |   Presupuesto: â‚¬{budget:,.0f}   |   Ventana: {status}")
     print()
     while True:
         print(_c(CYAN, "  1. Buscar jugadores"))
         print(_c(CYAN, "  2. Vender jugador"))
         print(_c(CYAN, "  3. Ver mi plantilla"))
         print(_c(CYAN, "  0. Volver"))
-        op = input_int("  Opción: ", 0, 3)
+        op = input_int("  OpciÃ³n: ", 0, 3)
         if op == 0:
             break
         elif op == 1:
@@ -2325,10 +2691,10 @@ def _market_menu(data: dict, mgr_team: Team, all_slots: dict[int, Team],
 
 
 def _winter_market_menu(data: dict, mgr_team: Team, comp_teams: list[Team], md: int):
-    print(_c(BOLD + YELLOW, "\n  ═══ VENTANA DE MERCADO DE INVIERNO ═══"))
-    ans = input_str("  ¿Quieres fichar algún jugador? (S/N): ").strip().upper()
+    print(_c(BOLD + YELLOW, "\n  â•â•â• VENTANA DE MERCADO DE INVIERNO â•â•â•"))
+    ans = input_str("  Â¿Quieres fichar algÃºn jugador? (S/N): ").strip().upper()
     if not ans.startswith("S"):
-        print(_c(GRAY, "  Continúa la temporada sin movimientos.\n"))
+        print(_c(GRAY, "  ContinÃºa la temporada sin movimientos.\n"))
         return
 
     budget = int(data.get("budget", 0))
@@ -2348,27 +2714,27 @@ def _winter_market_menu(data: dict, mgr_team: Team, comp_teams: list[Team], md: 
     picks = rng.sample(pool, k=min(3, len(pool)))
     picks = sorted(picks, key=lambda item: item[1].overall, reverse=True)
 
-    print(_c(GRAY, f"\n  Presupuesto disponible: €{budget:,.0f}"))
+    print(_c(GRAY, f"\n  Presupuesto disponible: â‚¬{budget:,.0f}"))
     print(_c(GRAY, f"  {'#':>3}  {'JUGADOR':<24} {'EQUIPO':<22} {'ME':>3} {'VALOR':<10}"))
-    print(_c(GRAY, "  " + "─" * 66))
+    print(_c(GRAY, "  " + "â”€" * 66))
     for i, (team, player) in enumerate(picks, 1):
-        val = f"€{player.market_value/1e6:.1f}M" if player.market_value >= 1_000_000 else f"€{player.market_value//1000}K"
+        val = f"â‚¬{player.market_value/1e6:.1f}M" if player.market_value >= 1_000_000 else f"â‚¬{player.market_value//1000}K"
         color = RESET if player.market_value <= budget else GRAY
         print(color + f"  {i:>3}  {player.name[:23]:<24} {team.name[:21]:<22} {player.me:>3} {val:<10}" + RESET)
     print()
 
     idx = input_int(f"  Fichar (1-{len(picks)}, 0=cancelar): ", 0, len(picks))
     if idx == 0:
-        print(_c(GRAY, "  Operación cancelada.\n"))
+        print(_c(GRAY, "  OperaciÃ³n cancelada.\n"))
         return
     src_team, player = picks[idx - 1]
     fee = int(player.market_value)
     if fee > budget:
-        print(_c(RED, f"  Sin presupuesto (necesitas €{fee:,.0f}, tienes €{budget:,.0f}).\n"))
+        print(_c(RED, f"  Sin presupuesto (necesitas â‚¬{fee:,.0f}, tienes â‚¬{budget:,.0f}).\n"))
         return
 
     if input_int("  1. Confirmar fichaje  0. Cancelar: ", 0, 1) == 0:
-        print(_c(GRAY, "  Operación cancelada.\n"))
+        print(_c(GRAY, "  OperaciÃ³n cancelada.\n"))
         return
 
     data["budget"] = budget - fee
@@ -2380,7 +2746,7 @@ def _winter_market_menu(data: dict, mgr_team: Team, comp_teams: list[Team], md: 
     src_team.players = [p for p in src_team.players if p.name != player.name]
     mgr_team.players.append(player)
     _save_career(data)
-    print(_c(GREEN, f"  ✓ {player.name} fichado por €{fee:,.0f}. Presupuesto: €{data['budget']:,.0f}\n"))
+    print(_c(GREEN, f"  âœ“ {player.name} fichado por â‚¬{fee:,.0f}. Presupuesto: â‚¬{data['budget']:,.0f}\n"))
 
 
 def _init_copa_state(data: dict, liga1: list[Team], liga2: list[Team]) -> dict:
@@ -2479,7 +2845,7 @@ def _play_copa_round(
     data["copa"] = copa
 
     if show_output and matches:
-        print(_c(BOLD + YELLOW, f"\n  ═══ COPA DEL REY · {label} ═══"))
+        print(_c(BOLD + YELLOW, f"\n  â•â•â• COPA DEL REY Â· {label} â•â•â•"))
         for m in matches:
             h = teams_by_slot[m["home"]].name
             a = teams_by_slot[m["away"]].name
@@ -2499,7 +2865,7 @@ def _play_copa_round(
             news.append(f"J{md}: Copa {label} - {home_name} {mgr_match['hg']}-{mgr_match['ag']} {away_name}. Eliminado.")
 
     if copa.get("champion") == mgr_slot:
-        news.append(f"J{md}: ¡Tu equipo gana la Copa del Rey!")
+        news.append(f"J{md}: Â¡Tu equipo gana la Copa del Rey!")
 
     _save_career(data)
     return matches
@@ -2533,6 +2899,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
     mgr_slot  = data["team_slot"]
     mgr_team  = {t.slot_id: t for t in comp_t}[mgr_slot]
     mgr_name  = data["manager"]["name"]
+    _ensure_manager_depth(data)
     seed      = data["season_seed"]
     tbs       = {t.slot_id: t for t in comp_t}   # teams_by_slot
     all_slots = {t.slot_id: t for t in liga1 + liga2 + liga_rfef + all_foreign}
@@ -2547,8 +2914,12 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
     # Build fixture map (deterministic, sorted by slot_id)
     all_fix    = generate_fixtures(comp_t)
     fix_by_md: dict[int, list[tuple[Team, Team]]] = {}
-    for i, pair in enumerate(all_fix):
-        fix_by_md.setdefault((i // fpm) + 1, []).append(pair)
+    fix_seed_by_key: dict[tuple[int, int, int], int] = {}
+    for i, pair in enumerate(all_fix, start=1):
+        md = ((i - 1) // fpm) + 1
+        h, a = pair
+        fix_by_md.setdefault(md, []).append(pair)
+        fix_seed_by_key[(md, h.slot_id, a.slot_id)] = int(seed) ^ i
 
     results = data.setdefault("results", [])
     news    = data.setdefault("news", [])
@@ -2563,7 +2934,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
                        if h.slot_id == mgr_slot or a.slot_id == mgr_slot), None)
         if my_fix:
             h, a = my_fix
-            print(_c(CYAN, f"  PRÓXIMO PARTIDO — Jornada {cur_md}:"))
+            print(_c(CYAN, f"  PRÃ“XIMO PARTIDO â€” Jornada {cur_md}:"))
             print(_c(BOLD + YELLOW, f"  {h.name}  vs  {a.name}"))
             print()
         copa_label = _active_copa_round_label(data.get("copa", {}), cur_md)
@@ -2572,19 +2943,25 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             print()
 
         tactic  = data.setdefault("tactic", dict(DEFAULT_TACTIC))
+        manager_depth = data.get("manager", {})
+        training = manager_depth.get("training", DEFAULT_TRAINING_PLAN)
+        staff = manager_depth.get("staff", DEFAULT_STAFF_PROFILE)
         win_tag = _c(GREEN, "[ABIERTO]") if _is_window_open(cur_md, tot_md) else _c(RED, "[CERRADO]")
-        print(_c(GRAY, f"  Táctica: {_tactic_summary(tactic)}"))
+        print(_c(GRAY, f"  TÃ¡ctica: {_tactic_summary(tactic)}"))
+        print(_c(GRAY, f"  Entrenamiento: {_training_plan_summary(training)}"))
+        print(_c(GRAY, f"  Staff clave: Fisio {staff.get('fisio', 50)} · Ojeador {staff.get('ojeador', 50)} · Juveniles {staff.get('juveniles', 50)}"))
         print()
         print(_c(CYAN, f"  1. Simular jornada {cur_md}"))
-        print(_c(CYAN,  "  2. Clasificación completa"))
+        print(_c(CYAN,  "  2. ClasificaciÃ³n completa"))
         print(_c(CYAN,  "  3. Plantilla"))
         print(_c(CYAN,  "  4. Noticias"))
         print(_c(CYAN,  "  5. Simular resto de temporada"))
         print(_c(CYAN,  f"  6. Mercado de fichajes {win_tag}"))
-        print(_c(CYAN,  "  7. Táctica"))
+        print(_c(CYAN,  "  7. TÃ¡ctica"))
+        print(_c(CYAN,  "  8. Entrenamiento y staff"))
         print(_c(CYAN,  "  0. Guardar y salir"))
 
-        op = input_int("  Opción: ", 0, 7)
+        op = input_int("  OpciÃ³n: ", 0, 8)
 
         if op == 0:
             data["current_matchday"] = cur_md
@@ -2595,15 +2972,15 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
         elif op == 1:
             md_res = []
             for h, a in fix_by_md.get(cur_md, []):
-                s            = seed ^ (cur_md * 7919 + h.slot_id * 31 + a.slot_id)
+                s            = fix_seed_by_key.get((cur_md, h.slot_id, a.slot_id), seed ^ (cur_md * 7919 + h.slot_id * 31 + a.slot_id))
                 is_mgr_match = h.slot_id == mgr_slot or a.slot_id == mgr_slot
                 ht           = tactic if h.slot_id == mgr_slot else None
                 at           = tactic if a.slot_id == mgr_slot else None
                 if is_mgr_match:
                     print(_c(CYAN, "\n  Modo de partido:"))
-                    print(_c(CYAN, "  1. Simular automáticamente"))
+                    print(_c(CYAN, "  1. Simular automÃ¡ticamente"))
                     print(_c(CYAN, "  2. Modo Entrenador  (fichas animadas)"))
-                    pm = input_int("  Opción (1-2): ", 1, 2)
+                    pm = input_int("  OpciÃ³n (1-2): ", 1, 2)
                     if pm == 2:
                         hg, ag = _match_entrenador(h, a, s, mgr_slot, data)
                     else:
@@ -2619,7 +2996,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             )
             if new_items:
                 for ni in new_items:
-                    print(_c(YELLOW, f"  📰 {ni}"))
+                    print(_c(YELLOW, f"  ðŸ“° {ni}"))
                 print()
             _play_copa_round(data, cur_md, all_slots, mgr_slot, show_output=True)
             cur_md += 1
@@ -2635,11 +3012,11 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
 
         elif op == 4:
             if not news:
-                print(_c(GRAY, "  Sin noticias aún.\n"))
+                print(_c(GRAY, "  Sin noticias aÃºn.\n"))
             else:
-                print(_c(YELLOW, "\n  ─── NOTICIAS ───"))
+                print(_c(YELLOW, "\n  â”€â”€â”€ NOTICIAS â”€â”€â”€"))
                 for ni in news[-5:]:
-                    print(f"  • {ni}")
+                    print(f"  â€¢ {ni}")
                 print()
 
         elif op == 6:
@@ -2649,13 +3026,16 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             _tactic_menu(data)
             tactic = data.get("tactic", tactic)
 
+        elif op == 8:
+            _manager_depth_menu(data)
+
         elif op == 5:
-            print(_c(YELLOW, f"\n  Simulando jornadas {cur_md}–{tot_md}..."))
+            print(_c(YELLOW, f"\n  Simulando jornadas {cur_md}â€“{tot_md}..."))
             winter_md = 21 if tot_md >= 42 else max(1, tot_md // 2)
             for md in range(cur_md, tot_md + 1):
                 md_res = []
                 for h, a in fix_by_md.get(md, []):
-                    s  = seed ^ (md * 7919 + h.slot_id * 31 + a.slot_id)
+                    s  = fix_seed_by_key.get((md, h.slot_id, a.slot_id), seed ^ (md * 7919 + h.slot_id * 31 + a.slot_id))
                     ht = tactic if h.slot_id == mgr_slot else None
                     at = tactic if a.slot_id == mgr_slot else None
                     hg, ag = simulate_match(h, a, s, home_tactic=ht, away_tactic=at)
@@ -2681,7 +3061,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             cur_md = tot_md + 1
             data["current_matchday"] = cur_md
             _save_career(data)
-            print(_c(GREEN, "  ✓ Temporada completada.\n"))
+            print(_c(GREEN, "  âœ“ Temporada completada.\n"))
             _pause()
 
     continue_career = _season_end_screen(
@@ -2698,7 +3078,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
     team = _show_offers(data, liga1, liga2, liga_rfef, liga_foreign)
     next_season = _next_season_str(data.get("season", "2025-26"))
     _setup_season(data, team, liga1, liga2, next_season, liga_rfef, liga_foreign)
-    print(_c(GREEN, f"\n  ¡{data['manager']['name']} ficha por {team.name}!"))
+    print(_c(GREEN, f"\n  Â¡{data['manager']['name']} ficha por {team.name}!"))
     print(_c(YELLOW, f"  Objetivo: {data['objective']}"))
     _pause()
     _season_loop(data, liga1, liga2, liga_rfef, liga_foreign)
@@ -2716,6 +3096,7 @@ def _next_season_str(season: str) -> str:
 
 def _setup_season(data: dict, team: Team, liga1: list[Team], liga2: list[Team], season: str,
                    liga_rfef: list[Team] = [], liga_foreign: "dict[str, list[Team]]" = {}):
+    _ensure_manager_depth(data)
     m = data["manager"]
     data.update({
         "phase":            "SEASON",
@@ -2744,21 +3125,21 @@ def _comp_name(comp: str) -> str:
     if info:
         country = info["country"]
         name = info["name"]
-        return name if country == "España" else f"{name} ({country})"
+        return name if country == "EspaÃ±a" else f"{name} ({country})"
     return comp
 
 
 def _show_offers(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] = [], liga_foreign: dict[str, list[Team]] = {}) -> Optional[Team]:
     m      = data["manager"]
     offers = _generate_offers(m["prestige"], liga1, liga2, liga_rfef, liga_foreign, data=data)
-    print(_c(BOLD + YELLOW, "\n  ═══ SELECCIÓN DE OFERTA ═══"))
+    print(_c(BOLD + YELLOW, "\n  â•â•â• SELECCIÃ“N DE OFERTA â•â•â•"))
     print(_c(GRAY,  f"  Prestigio: {_prestige_label(m['prestige'])}  |  Temporadas: {m['total_seasons']}"))
     print()
     for i, t in enumerate(offers, 1):
         cn  = _comp_name(t.comp)
         obj = _assign_objective(t, liga1, liga2, liga_rfef, liga_foreign)
         print(_c(CYAN, f"  {i}. {t.name}"))
-        print(f"       {cn}  ·  Fuerza: {t.strength():.1f}")
+        print(f"       {cn}  Â·  Fuerza: {t.strength():.1f}")
         print(f"       Objetivo: {obj}")
         print()
     idx = input_int(f"  Elige oferta (1-{len(offers)}): ", 1, len(offers))
@@ -2768,29 +3149,29 @@ def _show_offers(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
 # ---- Entry point -----------------------------------------------------------
 
 def menu_promanager(liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] = [], liga_foreign: dict[str, list[Team]] = {}):
-    print(_c(BOLD + CYAN, "\n  ╔══════════════════════════════════╗"))
-    print(_c(BOLD + CYAN, "  ║       MODO PRO MANAGER           ║"))
-    print(_c(BOLD + CYAN, "  ╚══════════════════════════════════╝"))
+    print(_c(BOLD + CYAN, "\n  â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"))
+    print(_c(BOLD + CYAN, "  â•‘       MODO PRO MANAGER           â•‘"))
+    print(_c(BOLD + CYAN, "  â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
 
     data = _load_career()
 
     if data:
         m = data["manager"]
-        print(_c(YELLOW, f"\n  Partida guardada — {m['name']}  {_prestige_label(m['prestige'])}"))
-        print(f"  {data.get('season','?')}  ·  {data.get('team_name','?')}  ·  J{data.get('current_matchday',1)}")
+        print(_c(YELLOW, f"\n  Partida guardada â€” {m['name']}  {_prestige_label(m['prestige'])}"))
+        print(f"  {data.get('season','?')}  Â·  {data.get('team_name','?')}  Â·  J{data.get('current_matchday',1)}")
         _print_career_summary(data)
         print()
         if data.get("phase") == "POSTSEASON":
             print(_c(CYAN, "  1. Nueva temporada (nuevas ofertas)"))
             print(_c(CYAN, "  2. Borrar y crear nuevo manager"))
             print(_c(CYAN, "  0. Volver"))
-            op = input_int("  Opción: ", 0, 2)
+            op = input_int("  OpciÃ³n: ", 0, 2)
             if op == 0:
                 return
             elif op == 1:
                 team = _show_offers(data, liga1, liga2, liga_rfef, liga_foreign)
                 _setup_season(data, team, liga1, liga2, _next_season_str(data["season"]), liga_rfef, liga_foreign)
-                print(_c(GREEN,  f"\n  ¡{m['name']} ficha por {team.name}!"))
+                print(_c(GREEN,  f"\n  Â¡{m['name']} ficha por {team.name}!"))
                 print(_c(YELLOW, f"  Objetivo: {data['objective']}"))
                 _pause()
                 _season_loop(data, liga1, liga2, liga_rfef, liga_foreign)
@@ -2801,7 +3182,7 @@ def menu_promanager(liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] 
             print(_c(CYAN, "  1. Continuar partida"))
             print(_c(CYAN, "  2. Borrar y crear nuevo manager"))
             print(_c(CYAN, "  0. Volver"))
-            op = input_int("  Opción: ", 0, 2)
+            op = input_int("  OpciÃ³n: ", 0, 2)
             if op == 0:
                 return
             elif op == 1:
@@ -2811,39 +3192,40 @@ def menu_promanager(liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] 
                 data = None
 
     # Crear nuevo manager
-    print(_c(BOLD + YELLOW, "\n  ─── NUEVO MANAGER ───"))
+    print(_c(BOLD + YELLOW, "\n  â”€â”€â”€ NUEVO MANAGER â”€â”€â”€"))
     name = input_str("  Nombre del manager: ")
     if not name:
         return
     data = {"manager": {"name": name, "prestige": 1, "total_seasons": 0, "history": []}}
+    _ensure_manager_depth(data)
 
     team = _show_offers(data, liga1, liga2, liga_rfef, liga_foreign)
     _setup_season(data, team, liga1, liga2, "2025-26", liga_rfef, liga_foreign)
     m = data["manager"]
-    print(_c(GREEN,  f"\n  ¡Bienvenido a {team.name}, {m['name']}!"))
+    print(_c(GREEN,  f"\n  Â¡Bienvenido a {team.name}, {m['name']}!"))
     print(_c(YELLOW, f"  Objetivo de la junta: {data['objective']}"))
     _pause()
     _season_loop(data, liga1, liga2, liga_rfef, liga_foreign)
 
 
 def menu_multiplayer():
-    print(_c(BOLD + CYAN, "\n  ╔══════════════════════════════════╗"))
-    print(_c(BOLD + CYAN, "  ║      MULTIJUGADOR POR TURNOS     ║"))
-    print(_c(BOLD + CYAN, "  ╚══════════════════════════════════╝"))
+    print(_c(BOLD + CYAN, "\n  â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"))
+    print(_c(BOLD + CYAN, "  â•‘      MULTIJUGADOR POR TURNOS     â•‘"))
+    print(_c(BOLD + CYAN, "  â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
     print(_c(YELLOW, "\n  Esta variante del CLI no incluye multijugador por turnos."))
     print(_c(GRAY,   "  Usa android/cli/pcfutbol_cli.py para jugar en modo multi.\n"))
     _pause()
 
 
 # ===========================================================================
-# MENÚ PRINCIPAL
+# MENÃš PRINCIPAL
 # ===========================================================================
 
 def main_menu():
-    print(_c(BOLD + CYAN,  "\n  ╔══════════════════════════════════╗"))
-    print(_c(BOLD + CYAN,  "  ║    PC FÚTBOL 5  ·  CLI  2025/26  ║"))
-    print(_c(BOLD + CYAN,  "  ║      Temporada real — Python      ║"))
-    print(_c(BOLD + CYAN,  "  ╚══════════════════════════════════╝"))
+    print(_c(BOLD + CYAN,  "\n  â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"))
+    print(_c(BOLD + CYAN,  "  â•‘    PC FÃšTBOL 5  Â·  CLI  2025/26  â•‘"))
+    print(_c(BOLD + CYAN,  "  â•‘      Temporada real â€” Python      â•‘"))
+    print(_c(BOLD + CYAN,  "  â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"))
 
     print(_c(YELLOW, "\n  Cargando datos de temporada 2025/26..."))
     all_teams = load_teams()
@@ -2858,33 +3240,33 @@ def main_menu():
     }
     liga_foreign = {k: v for k, v in liga_foreign.items() if v}
 
-    print(_c(GREEN, f"  ✓ {len(liga1)} equipos en Primera División"))
-    print(_c(GREEN, f"  ✓ {len(liga2)} equipos en Segunda División"))
-    print(_c(GREEN, f"  ✓ {len(liga_rfef)} equipos en 1ª RFEF"))
+    print(_c(GREEN, f"  âœ“ {len(liga1)} equipos en Primera DivisiÃ³n"))
+    print(_c(GREEN, f"  âœ“ {len(liga2)} equipos en Segunda DivisiÃ³n"))
+    print(_c(GREEN, f"  âœ“ {len(liga_rfef)} equipos en 1Âª RFEF"))
     _n_foreign = sum(len(v) for v in liga_foreign.values())
     if _n_foreign:
-        print(_c(GREEN, f"  ✓ {_n_foreign} equipos en {len(liga_foreign)} ligas extranjeras"))
+        print(_c(GREEN, f"  âœ“ {_n_foreign} equipos en {len(liga_foreign)} ligas extranjeras"))
     total_players = sum(len(t.players) for t in liga1 + liga2 + liga_rfef) + sum(len(t.players) for ts in liga_foreign.values() for t in ts)
-    print(_c(GREEN, f"  ✓ {total_players} jugadores cargados\n"))
+    print(_c(GREEN, f"  âœ“ {total_players} jugadores cargados\n"))
 
     while True:
-        print(_c(CYAN,   "  ┌──────────────────────────────────┐"))
-        print(_c(CYAN,   "  │         MENÚ PRINCIPAL           │"))
-        print(_c(CYAN,   "  ├──────────────────────────────────┤"))
-        print(_c(CYAN,   "  │  1. Simular temporada completa   │"))
-        print(_c(CYAN,   "  │  2. Ver plantilla de equipo      │"))
-        print(_c(CYAN,   "  │  3. Partido rápido               │"))
-        print(_c(CYAN,   "  │  4. Top jugadores                │"))
-        print(_c(CYAN,   "  │  5. Ranking de fortaleza         │"))
-        print(_c(BOLD + CYAN, "  │  6. PRO MANAGER (modo carrera)  │"))
-        print(_c(BOLD + CYAN, "  │  7. MULTIJUGADOR por turnos     │"))
-        print(_c(BOLD + CYAN, "  │  8. Actualidad futbolistica      │"))
-        print(_c(CYAN,   "  │  0. Salir                        │"))
-        print(_c(CYAN,   "  └──────────────────────────────────┘"))
+        print(_c(CYAN,   "  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”"))
+        print(_c(CYAN,   "  â”‚         MENÃš PRINCIPAL           â”‚"))
+        print(_c(CYAN,   "  â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤"))
+        print(_c(CYAN,   "  â”‚  1. Simular temporada completa   â”‚"))
+        print(_c(CYAN,   "  â”‚  2. Ver plantilla de equipo      â”‚"))
+        print(_c(CYAN,   "  â”‚  3. Partido rÃ¡pido               â”‚"))
+        print(_c(CYAN,   "  â”‚  4. Top jugadores                â”‚"))
+        print(_c(CYAN,   "  â”‚  5. Ranking de fortaleza         â”‚"))
+        print(_c(BOLD + CYAN, "  â”‚  6. PRO MANAGER (modo carrera)  â”‚"))
+        print(_c(BOLD + CYAN, "  â”‚  7. MULTIJUGADOR por turnos     â”‚"))
+        print(_c(BOLD + CYAN, "  â”‚  8. Actualidad futbolistica      â”‚"))
+        print(_c(CYAN,   "  â”‚  0. Salir                        â”‚"))
+        print(_c(CYAN,   "  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜"))
 
-        op = input_int("  Opción: ", 0, 8)
+        op = input_int("  OpciÃ³n: ", 0, 8)
         if op == 0:
-            print(_c(GRAY, "\n  ¡Hasta la próxima temporada!\n"))
+            print(_c(GRAY, "\n  Â¡Hasta la prÃ³xima temporada!\n"))
             break
         elif op == 1:
             menu_simulate_season(liga1, liga2)
@@ -2910,3 +3292,4 @@ if __name__ == "__main__":
         for name in ("CYAN", "YELLOW", "GREEN", "RED", "GRAY", "BOLD", "RESET"):
             globals()[name] = ""
     main_menu()
+
