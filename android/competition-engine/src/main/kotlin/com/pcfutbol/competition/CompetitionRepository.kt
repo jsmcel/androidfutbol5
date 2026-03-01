@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.roundToInt
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -380,14 +381,53 @@ class CompetitionRepository @Inject constructor(
         val team = teamDao.byId(managerTeamId) ?: return
         val squad = playerDao.byTeamNow(managerTeamId)
         val wagesCostK = squad.sumOf { it.wageK }.coerceAtLeast(500)
-
-        val sponsorIncomeK = (team.membersCount / 20).coerceIn(300, 7000) + team.prestige * 40
         val homeGame = managerFixture.homeTeamId == managerTeamId
-        val attendanceIncomeK = if (homeGame) {
-            (team.membersCount / 18).coerceIn(250, 5000)
-        } else {
-            (team.membersCount / 35).coerceIn(120, 1800)
+        val managerGoals = if (homeGame) managerResult.homeGoals else managerResult.awayGoals
+        val rivalGoals = if (homeGame) managerResult.awayGoals else managerResult.homeGoals
+        val goalDiff = managerGoals - rivalGoals
+        val refereeReview = evaluateRefereeMoviola(
+            state = seasonState,
+            fixture = managerFixture,
+            result = managerResult,
+            managerTeamId = managerTeamId,
+            matchday = matchday,
+        )
+        val climateAfterDecay = when {
+            seasonState.refereeClimate > 0 -> seasonState.refereeClimate - 1
+            seasonState.refereeClimate < 0 -> seasonState.refereeClimate + 1
+            else -> 0
         }
+        val stateWithReferee = seasonState.copy(
+            refereeLastBalance = refereeReview.balance,
+            refereeLastVerdict = refereeReview.verdict,
+            refereeLastMoviola = refereeReview.summary,
+            refereeClimate = climateAfterDecay.coerceIn(-20, 20),
+            refereeLastRandomBias = refereeReview.randomBias,
+        )
+        newsDao.insert(
+            NewsEntity(
+                date = java.time.LocalDate.now().toString(),
+                matchday = matchday,
+                category = "REFEREE",
+                titleEs = "Moviola J$matchday: ${refereeReview.verdictLabel}",
+                bodyEs = refereeReview.summary,
+                teamId = managerTeamId,
+            )
+        )
+
+        val baseSponsorIncomeK = (team.membersCount / 20).coerceIn(300, 7000) + team.prestige * 40
+        val marketUpdate = applyMarketWeeklyEffects(
+            state = stateWithReferee,
+            team = team,
+            matchday = matchday,
+            homeGame = homeGame,
+            managerGoalDiff = goalDiff,
+            baseSponsorIncomeK = baseSponsorIncomeK,
+        )
+        val sponsorIncomeK = marketUpdate.sponsorIncomeK
+        val attendanceIncomeK = marketUpdate.ticketIncomeK
+        val merchIncomeK = marketUpdate.merchIncomeK
+        val communicationCostK = marketUpdate.communicationCostK
         val resultBonusK = when {
             homeGame && managerResult.homeGoals > managerResult.awayGoals -> 220
             !homeGame && managerResult.awayGoals > managerResult.homeGoals -> 260
@@ -395,11 +435,12 @@ class CompetitionRepository @Inject constructor(
             else -> -120
         }
 
-        val netK = sponsorIncomeK + attendanceIncomeK + resultBonusK - wagesCostK
+        val netK = sponsorIncomeK + attendanceIncomeK + merchIncomeK + resultBonusK - wagesCostK - communicationCostK
         var newBudgetK = (team.budgetK + netK).coerceAtLeast(0)
         var presidentEvents: List<String> = emptyList()
+        var stateAfterUpdates = marketUpdate.state
 
-        if (allowsPresidentDesk(seasonState.normalizedControlMode)) {
+        if (allowsPresidentDesk(stateAfterUpdates.normalizedControlMode)) {
             val managerStanding = updatedStandings.firstOrNull { it.teamId == managerTeamId }
             val managerPosition = managerStanding?.position?.takeIf { it > 0 } ?: (updatedStandings.size + 1)
             val totalTeams = updatedStandings.size.coerceAtLeast(1)
@@ -408,13 +449,8 @@ class CompetitionRepository @Inject constructor(
                 ?.coerceAtLeast(1)
                 ?: 3
 
-            val isHomeManager = managerFixture.homeTeamId == managerTeamId
-            val managerGoals = if (isHomeManager) managerResult.homeGoals else managerResult.awayGoals
-            val rivalGoals = if (isHomeManager) managerResult.awayGoals else managerResult.homeGoals
-            val goalDiff = managerGoals - rivalGoals
-
             val presidentUpdate = applyPresidentWeeklyEffects(
-                state = seasonState,
+                state = stateAfterUpdates,
                 teamId = managerTeamId,
                 matchday = matchday,
                 wageBillK = wagesCostK,
@@ -423,8 +459,9 @@ class CompetitionRepository @Inject constructor(
                 managerPosition = managerPosition,
                 totalTeams = totalTeams,
                 relegationSlots = relegationSlots,
+                marketPressureDelta = marketUpdate.pressureDelta,
             )
-            seasonStateDao.update(presidentUpdate.state)
+            stateAfterUpdates = presidentUpdate.state
             newBudgetK = presidentUpdate.budgetK
             presidentEvents = presidentUpdate.events
 
@@ -442,6 +479,7 @@ class CompetitionRepository @Inject constructor(
             }
         }
 
+        seasonStateDao.update(stateAfterUpdates)
         teamDao.update(team.copy(budgetK = newBudgetK))
 
         newsDao.insert(
@@ -451,7 +489,15 @@ class CompetitionRepository @Inject constructor(
                 category = "FINANCE",
                 titleEs = "Caja semanal ${if (netK >= 0) "+" else ""}${netK}K",
                 bodyEs = buildString {
-                    append("Sponsor ${sponsorIncomeK}K + taquilla ${attendanceIncomeK}K + bonus ${resultBonusK}K - salarios ${wagesCostK}K.")
+                    append(
+                        "Sponsor ${sponsorIncomeK}K + taquilla ${attendanceIncomeK}K + merchandising ${merchIncomeK}K " +
+                            "+ bonus ${resultBonusK}K - salarios ${wagesCostK}K - comunicacion ${communicationCostK}K."
+                    )
+                    append(" Asistencia: ${marketUpdate.attendance}.")
+                    if (marketUpdate.events.isNotEmpty()) {
+                        append(" Entorno/mercado: ")
+                        append(marketUpdate.events.joinToString(" "))
+                    }
                     if (presidentEvents.isNotEmpty()) {
                         append(" Junta: ")
                         append(presidentEvents.joinToString(" "))
@@ -459,6 +505,309 @@ class CompetitionRepository @Inject constructor(
                 },
                 teamId = managerTeamId,
             )
+        )
+    }
+
+    private data class MarketWeeklyUpdate(
+        val state: SeasonStateEntity,
+        val attendance: Int,
+        val sponsorIncomeK: Int,
+        val ticketIncomeK: Int,
+        val merchIncomeK: Int,
+        val communicationCostK: Int,
+        val pressureDelta: Int,
+        val events: List<String>,
+    )
+
+    private data class RefereeMoviolaReview(
+        val balance: Int,
+        val verdict: String,
+        val verdictLabel: String,
+        val summary: String,
+        val randomBias: Int,
+    )
+
+    private fun applyMarketWeeklyEffects(
+        state: SeasonStateEntity,
+        team: TeamEntity,
+        matchday: Int,
+        homeGame: Boolean,
+        managerGoalDiff: Int,
+        baseSponsorIncomeK: Int,
+    ): MarketWeeklyUpdate {
+        val seed = state.season.hashCode().toLong() xor
+            (team.slotId.toLong() shl 8) xor
+            (matchday.toLong() * 1181L) xor
+            0x77A5L
+        val rng = kotlin.random.Random(seed)
+
+        val shirtPrice = state.marketShirtPriceEur.coerceIn(25, 180)
+        var press = state.marketPressRating.coerceIn(0, 100)
+        var channel = state.marketChannelLevel.coerceIn(0, 100)
+        var mood = state.marketFanMood.coerceIn(0, 100)
+        var socialMassK = state.marketSocialMassK.coerceAtLeast(0)
+        var environment = state.marketEnvironment.coerceIn(0, 100)
+        var trend = state.marketTrend.coerceIn(-20, 20)
+        var lastEventMatchday = state.marketLastEventMatchday.coerceAtLeast(0)
+        val events = mutableListOf<String>()
+        var statementPressureDelta = 0
+
+        if (socialMassK <= 0) {
+            socialMassK = (team.membersCount / 35).coerceIn(40, 2600)
+        }
+
+        mood = (mood + when {
+            managerGoalDiff >= 2 -> 4
+            managerGoalDiff == 1 -> 2
+            managerGoalDiff == 0 -> 0
+            managerGoalDiff == -1 -> -3
+            else -> -5
+        } + if (homeGame) 1 else 0).coerceIn(0, 100)
+        trend = (trend + when {
+            managerGoalDiff > 0 -> 1
+            managerGoalDiff < 0 -> -1
+            else -> 0
+        }).coerceIn(-20, 20)
+
+        val eventDue = (matchday - lastEventMatchday >= 3) && rng.nextDouble() < 0.18
+        if (eventDue) {
+            when (rng.nextInt(5)) {
+                0 -> {
+                    environment = (environment + 8).coerceAtMost(100)
+                    mood = (mood + 4).coerceAtMost(100)
+                    trend = (trend + 2).coerceAtMost(20)
+                    events += "Buen clima y ambiente premium impulsan la asistencia."
+                }
+                1 -> {
+                    environment = (environment - 12).coerceAtLeast(0)
+                    mood = (mood - 3).coerceAtLeast(0)
+                    trend = (trend - 2).coerceAtLeast(-20)
+                    events += "Lluvia intensa reduce el tiron del estadio."
+                }
+                2 -> {
+                    environment = (environment - 10).coerceAtLeast(0)
+                    mood = (mood - 4).coerceAtLeast(0)
+                    trend = (trend - 3).coerceAtLeast(-20)
+                    events += "Incidencias de transporte enfrían la masa social."
+                }
+                3 -> {
+                    channel = (channel + 6).coerceAtMost(100)
+                    press = (press + 3).coerceAtMost(100)
+                    trend = (trend + 3).coerceAtMost(20)
+                    events += "Campana viral del club dispara alcance digital."
+                }
+                else -> {
+                    press = (press - 6).coerceAtLeast(0)
+                    mood = (mood - 5).coerceAtLeast(0)
+                    trend = (trend - 3).coerceAtLeast(-20)
+                    events += "Ruido mediático negativo castiga la reputacion."
+                }
+            }
+            lastEventMatchday = matchday
+        } else {
+            environment = (environment + rng.nextInt(-1, 2)).coerceIn(15, 95)
+            trend = when {
+                trend > 0 -> (trend - 1).coerceAtLeast(0)
+                trend < 0 -> (trend + 1).coerceAtMost(0)
+                else -> 0
+            }
+        }
+
+        if (state.marketLastStatementMatchday != matchday) {
+            val baseIntensity = (
+                when {
+                    managerGoalDiff <= -2 -> 68
+                    managerGoalDiff == -1 -> 60
+                    managerGoalDiff == 0 -> 52
+                    managerGoalDiff == 1 -> 44
+                    else -> 36
+                } + ((state.presidentPressure.coerceIn(0, 12) - 6) * 3)
+                ).coerceIn(20, 90)
+            if (rng.nextDouble() < 0.30) {
+                val assertive = baseIntensity >= 58 || rng.nextDouble() < 0.45
+                val successChance = (
+                    55 +
+                        press / 4 +
+                        channel / 6 +
+                        managerGoalDiff * 6 -
+                        if (assertive) 10 else 0
+                    ).coerceIn(25, 85)
+                val success = rng.nextInt(100) < successChance
+                if (success) {
+                    mood = (mood + if (assertive) 3 else 2).coerceAtMost(100)
+                    trend = (trend + 1).coerceAtMost(20)
+                    events += if (assertive) {
+                        "Entrenador aprieta al grupo y la plantilla responde."
+                    } else {
+                        "Entrenador protege al vestuario y calma el ruido."
+                    }
+                } else {
+                    mood = (mood - if (assertive) 3 else 1).coerceAtLeast(0)
+                    trend = (trend - 1).coerceAtLeast(-20)
+                    events += if (assertive) {
+                        "Declaracion dura del entrenador genera desgaste interno."
+                    } else {
+                        "Mensaje blando del entrenador se percibe como duda."
+                    }
+                }
+            }
+            if (state.presidentPressure >= 7 || rng.nextDouble() < 0.24) {
+                val assertive = state.presidentPressure >= 8 || baseIntensity >= 60
+                val successChance = (
+                    52 +
+                        press / 5 +
+                        channel / 7 -
+                        state.presidentPressure / 2 -
+                        if (assertive) 8 else 0
+                    ).coerceIn(20, 80)
+                val success = rng.nextInt(100) < successChance
+                if (success) {
+                    press = (press + 2).coerceAtMost(100)
+                    mood = (mood + 1).coerceAtMost(100)
+                    statementPressureDelta -= if (assertive) 1 else 0
+                    events += if (assertive) {
+                        "Presidente marca exigencia publica y ordena el entorno."
+                    } else {
+                        "Presidente transmite confianza y estabiliza el club."
+                    }
+                } else {
+                    press = (press - 2).coerceAtLeast(0)
+                    mood = (mood - 1).coerceAtLeast(0)
+                    statementPressureDelta += if (assertive) 2 else 1
+                    events += if (assertive) {
+                        "Presidente tensiona la rueda de prensa y sube la presion."
+                    } else {
+                        "Mensaje presidencial ambiguo alimenta dudas."
+                    }
+                }
+            }
+        }
+
+        val socialDelta = (
+            managerGoalDiff * 6 +
+                (mood - 50) / 5 +
+                (press - 50) / 8 +
+                (channel - 50) / 7 +
+                trend
+            ).coerceIn(-28, 34)
+        socialMassK = (socialMassK + socialDelta).coerceIn(25, 6000)
+
+        val attendanceRate = (
+            0.30 +
+                mood * 0.0030 +
+                environment * 0.0018 +
+                press * 0.0012 +
+                channel * 0.0010 +
+                trend * 0.0025 +
+                if (homeGame) 0.14 else -0.12
+            ).coerceIn(0.10, 0.96)
+        val attendance = (socialMassK * 1000.0 * attendanceRate).roundToInt().coerceAtLeast(1200)
+
+        val ticketPriceEur = (16.0 + team.prestige * 1.4 + environment * 0.07).coerceAtLeast(10.0)
+        val ticketIncomeK = ((attendance * ticketPriceEur) / 1000.0).roundToInt().coerceAtLeast(80)
+
+        val demandUnits = (
+            socialMassK * (
+                0.40 +
+                    mood * 0.0020 +
+                    channel * 0.0022 +
+                    press * 0.0015 +
+                    trend.coerceAtLeast(0) * 0.0030
+                )
+            ).roundToInt().coerceAtLeast(15)
+        val priceElasticity = when {
+            shirtPrice <= 55 -> 1.10
+            shirtPrice <= 75 -> 1.00
+            shirtPrice <= 95 -> 0.92
+            shirtPrice <= 120 -> 0.82
+            else -> 0.70
+        }
+        val merchIncomeK = ((demandUnits * shirtPrice * priceElasticity) / 1000.0).roundToInt().coerceAtLeast(50)
+        val communicationCostK = (120 + channel * 3 + press * 2).coerceIn(160, 1600)
+        val sponsorAdjustK = ((press + channel + mood - 150) / 2).coerceIn(-180, 420)
+        val sponsorIncomeK = (baseSponsorIncomeK + sponsorAdjustK).coerceAtLeast(200)
+        val pressureDelta = when {
+            mood <= 32 || trend <= -10 -> 1
+            mood >= 78 && trend >= 8 -> -1
+            else -> 0
+        } + statementPressureDelta
+
+        return MarketWeeklyUpdate(
+            state = state.copy(
+                marketShirtPriceEur = shirtPrice,
+                marketPressRating = press,
+                marketChannelLevel = channel,
+                marketFanMood = mood,
+                marketSocialMassK = socialMassK,
+                marketEnvironment = environment,
+                marketTrend = trend,
+                marketLastEventMatchday = lastEventMatchday,
+                marketLastStatementMatchday = state.marketLastStatementMatchday.coerceAtLeast(0),
+            ),
+            attendance = attendance,
+            sponsorIncomeK = sponsorIncomeK,
+            ticketIncomeK = ticketIncomeK,
+            merchIncomeK = merchIncomeK,
+            communicationCostK = communicationCostK,
+            pressureDelta = pressureDelta.coerceIn(-2, 3),
+            events = events,
+        )
+    }
+
+    private fun evaluateRefereeMoviola(
+        state: SeasonStateEntity,
+        fixture: FixtureEntity,
+        result: MatchResult,
+        managerTeamId: Int,
+        matchday: Int,
+    ): RefereeMoviolaReview {
+        val managerIsHome = fixture.homeTeamId == managerTeamId
+        val managerEventTeamId = if (managerIsHome) fixture.homeTeamId else fixture.awayTeamId
+        val rivalEventTeamId = if (managerIsHome) fixture.awayTeamId else fixture.homeTeamId
+        val managerReds = result.events.count { it.type == EventType.RED_CARD && it.teamId == managerEventTeamId }
+        val rivalReds = result.events.count { it.type == EventType.RED_CARD && it.teamId == rivalEventTeamId }
+        val managerVarDisallowed = if (managerIsHome) result.varDisallowedHome else result.varDisallowedAway
+        val rivalVarDisallowed = if (managerIsHome) result.varDisallowedAway else result.varDisallowedHome
+        val managerYellows = result.events.count { it.type == EventType.YELLOW_CARD && it.teamId == managerEventTeamId }
+        val rivalYellows = result.events.count { it.type == EventType.YELLOW_CARD && it.teamId == rivalEventTeamId }
+
+        var score = 0
+        score += (rivalReds - managerReds) * 2
+        score += (rivalVarDisallowed - managerVarDisallowed) * 2
+        score += ((rivalYellows - managerYellows) / 2)
+        val rngSeed = state.season.hashCode().toLong() xor
+            (fixture.id.toLong() shl 4) xor
+            (managerTeamId.toLong() * 97L) xor
+            (matchday.toLong() * 733L)
+        val rng = kotlin.random.Random(rngSeed)
+        val neutralNoise = rng.nextInt(-2, 3) + rng.nextInt(-2, 3) // media ~0, desviacion moderada
+        val climateImpact = (state.refereeClimate.coerceIn(-20, 20) / 6).coerceIn(-3, 3)
+        val randomBias = (neutralNoise + climateImpact).coerceIn(-4, 4)
+        score += randomBias
+        score = score.coerceIn(-6, 6)
+
+        val verdict = when {
+            score >= 2 -> "FAVORED"
+            score <= -2 -> "HARMED"
+            else -> "NEUTRAL"
+        }
+        val verdictLabel = when (verdict) {
+            "FAVORED" -> "Beneficiado"
+            "HARMED" -> "Perjudicado"
+            else -> "Neutro"
+        }
+        val summary = buildString {
+            append("Balance arbitral: $verdictLabel. ")
+            append("Rojas: tu equipo $managerReds / rival $rivalReds. ")
+            append("VAR anulados: tu equipo $managerVarDisallowed / rival $rivalVarDisallowed.")
+            append(" Factor contextual: ${if (randomBias >= 0) "+" else ""}$randomBias.")
+        }
+        return RefereeMoviolaReview(
+            balance = score,
+            verdict = verdict,
+            verdictLabel = verdictLabel,
+            summary = summary,
+            randomBias = randomBias,
         )
     }
 
@@ -478,6 +827,7 @@ class CompetitionRepository @Inject constructor(
         managerPosition: Int,
         totalTeams: Int,
         relegationSlots: Int,
+        marketPressureDelta: Int,
     ): PresidentWeeklyUpdate {
         val rngSeed = state.season.hashCode().toLong() xor
             (matchday.toLong() * 65537L) xor
@@ -508,6 +858,7 @@ class CompetitionRepository @Inject constructor(
             managerGoalDiff == -1 -> 1
             else -> 0
         }
+        pressure += marketPressureDelta
         if (managerPosition > totalTeams - relegationSlots) {
             pressure += 1
         } else if (managerPosition <= maxOf(3, totalTeams / 4)) {

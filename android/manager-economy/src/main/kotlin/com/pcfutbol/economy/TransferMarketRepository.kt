@@ -115,7 +115,10 @@ class TransferMarketRepository @Inject constructor(
             ?: return Result.failure(Exception("Equipo no encontrado"))
         val sellerTeam = player.teamSlotId?.let { teamDao.byId(it) }
         val marketComp = sellerTeam?.competitionKey ?: buyerTeam.competitionKey
-        val marketValueK = WageCalculator.marketValueK(player, marketComp)
+        val marketBaseValueK = WageCalculator.marketValueK(player, marketComp)
+        val marketValueK = (marketBaseValueK * marketDynamicsMultiplier(state))
+            .toInt()
+            .coerceAtLeast(50)
         val minOffer = (marketValueK * 0.75).toInt()
         if (offeredAmountK < minOffer) {
             return Result.failure(Exception("Oferta demasiado baja (min. ${minOffer}K)"))
@@ -209,7 +212,10 @@ class TransferMarketRepository @Inject constructor(
         }
         val sellerTeam = teamDao.byId(managerTeamId) ?: return Result.failure(Exception("Equipo no encontrado"))
 
-        val marketValueK = WageCalculator.marketValueK(player, sellerTeam.competitionKey)
+        val marketBaseValueK = WageCalculator.marketValueK(player, sellerTeam.competitionKey)
+        val marketValueK = (marketBaseValueK * marketDynamicsMultiplier(state))
+            .toInt()
+            .coerceAtLeast(50)
         val minSale = (marketValueK * 0.55).toInt().coerceAtLeast(50)
         if (askingPriceK < minSale) {
             return Result.failure(Exception("Precio demasiado bajo (min. ${minSale}K)"))
@@ -395,5 +401,18 @@ class TransferMarketRepository @Inject constructor(
             releaseClauseK = clauseK,
             contractEndYear = seasonStart + durationYears,
         )
+    }
+
+    private fun marketDynamicsMultiplier(state: SeasonStateEntity): Double {
+        val trend = state.marketTrend.coerceIn(-20, 20)
+        val mood = state.marketFanMood.coerceIn(0, 100)
+        val press = state.marketPressRating.coerceIn(0, 100)
+        val climate = state.refereeClimate.coerceIn(-20, 20)
+        val base = 1.0 +
+            trend * 0.005 +
+            (mood - 50) * 0.0015 +
+            (press - 50) * 0.0010 +
+            climate * 0.0008
+        return base.coerceIn(0.85, 1.18)
     }
 }

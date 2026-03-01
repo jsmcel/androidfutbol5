@@ -182,6 +182,113 @@ fun PresidentDeskScreen(
                 )
             }
 
+            DosPanel(title = "MERCADO SOCIAL") {
+                DeskLine("Masa social", "${state.socialMassK}K", DosCyan)
+                DeskLine("Precio camiseta", "${state.shirtPriceEur}€", DosWhite)
+                DeskLine("Prensa", state.pressRating.toString(), DosYellow)
+                DeskLine("Canal club", state.channelLevel.toString(), DosYellow)
+                DeskLine("Animo aficion", state.fanMood.toString(), DosGreen)
+                DeskLine("Entorno", state.environment.toString(), DosCyan)
+                DeskLine("Tendencia", "${if (state.marketTrend >= 0) "+" else ""}${state.marketTrend}", if (state.marketTrend >= 0) DosGreen else DosRed)
+                Spacer(Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DosButton(
+                        text = "CAMISETA +",
+                        onClick = { vm.trigger(PresidentAction.SHIRT_PRICE_UP) },
+                        modifier = Modifier.weight(1f),
+                        color = DosGray,
+                    )
+                    DosButton(
+                        text = "CAMISETA -",
+                        onClick = { vm.trigger(PresidentAction.SHIRT_PRICE_DOWN) },
+                        modifier = Modifier.weight(1f),
+                        color = DosGray,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DosButton(
+                        text = "PRENSA",
+                        onClick = { vm.trigger(PresidentAction.PRESS_CAMPAIGN) },
+                        modifier = Modifier.weight(1f),
+                        color = DosCyan,
+                    )
+                    DosButton(
+                        text = "CANAL",
+                        onClick = { vm.trigger(PresidentAction.CHANNEL_EXPANSION) },
+                        modifier = Modifier.weight(1f),
+                        color = DosYellow,
+                    )
+                }
+            }
+
+            DosPanel(title = "DECLARACIONES") {
+                DeskLine("Moviola", state.refereeVerdictLabel, when {
+                    state.refereeBalance <= -2 -> DosRed
+                    state.refereeBalance >= 2 -> DosGreen
+                    else -> DosGray
+                })
+                DeskLine(
+                    "Balance arbitral",
+                    "${if (state.refereeBalance >= 0) "+" else ""}${state.refereeBalance}",
+                    if (state.refereeBalance >= 0) DosGreen else DosRed,
+                )
+                DeskLine(
+                    "Declaracion en J",
+                    if (state.lastStatementMatchday == state.matchday) "YA HECHA" else "DISPONIBLE",
+                    if (state.lastStatementMatchday == state.matchday) DosGray else DosCyan,
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DosButton(
+                        text = "DT CALMA",
+                        onClick = { vm.trigger(PresidentAction.COACH_CALM) },
+                        modifier = Modifier.weight(1f),
+                        color = DosGray,
+                    )
+                    DosButton(
+                        text = "DT EXIGE",
+                        onClick = { vm.trigger(PresidentAction.COACH_DEMAND) },
+                        modifier = Modifier.weight(1f),
+                        color = DosGray,
+                    )
+                    DosButton(
+                        text = "DT ARBITRO",
+                        onClick = { vm.trigger(PresidentAction.COACH_REFEREE) },
+                        modifier = Modifier.weight(1f),
+                        color = DosGray,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DosButton(
+                        text = "PRESI CALMA",
+                        onClick = { vm.trigger(PresidentAction.PRESIDENT_CALM) },
+                        modifier = Modifier.weight(1f),
+                        color = DosCyan,
+                    )
+                    DosButton(
+                        text = "PRESI EXIGE",
+                        onClick = { vm.trigger(PresidentAction.PRESIDENT_DEMAND) },
+                        modifier = Modifier.weight(1f),
+                        color = DosCyan,
+                    )
+                    DosButton(
+                        text = "PRESI ARBITRO",
+                        onClick = { vm.trigger(PresidentAction.PRESIDENT_REFEREE) },
+                        modifier = Modifier.weight(1f),
+                        color = DosCyan,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = state.refereeMoviola,
+                    color = DosWhite,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                )
+            }
+
             state.message?.let { message ->
                 DosPanel(title = "ULTIMA DECISION") {
                     Text(

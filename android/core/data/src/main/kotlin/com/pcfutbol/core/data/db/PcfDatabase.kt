@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase
         NewsEntity::class,
         NationalSquadEntity::class,
     ],
-    version = 6,
+    version = 10,
     exportSchema = true,
 )
 abstract class PcfDatabase : RoomDatabase() {

@@ -89,9 +89,17 @@ fun FinanceScreen(
             FinanceLine("Nomina semanal", "-${state.payrollWeeklyK}K", DosRed)
             FinanceLine("Sponsor (estim.)", "+${state.projectedSponsorK}K", DosCyan)
             FinanceLine("Taquilla (estim.)", "+${state.projectedTicketK}K", DosCyan)
+            FinanceLine("Merchandising (estim.)", "+${state.projectedMerchK}K", DosCyan)
+            FinanceLine("Comunicacion (estim.)", "-${state.projectedCommunicationCostK}K", DosRed)
             val net = state.projectedNetWeeklyK
             FinanceLine("Balance semanal", "${if (net >= 0) "+" else ""}${net}K", if (net >= 0) DosGreen else DosRed)
             FinanceLine("Valor plantilla", "${state.squadMarketValueK}K", DosYellow)
+            FinanceLine("Masa social", "${state.socialMassK}K", DosCyan)
+            FinanceLine("Precio camiseta", "${state.shirtPriceEur}€", DosWhite)
+            FinanceLine("Prensa / Canal", "${state.pressRating} / ${state.channelLevel}", DosYellow)
+            FinanceLine("Animo / Entorno", "${state.fanMood} / ${state.environment}", DosYellow)
+            FinanceLine("Tendencia mercado", "${if (state.marketTrend >= 0) "+" else ""}${state.marketTrend}", if (state.marketTrend >= 0) DosGreen else DosRed)
+            FinanceLine("Moviola", state.refereeVerdictLabel, DosGray)
         }
 
         Spacer(Modifier.height(8.dp))

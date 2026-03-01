@@ -39,6 +39,16 @@ enum class PresidentAction {
     STATE_PROJECT,
     IPO,
     PELOTAZO,
+    SHIRT_PRICE_UP,
+    SHIRT_PRICE_DOWN,
+    PRESS_CAMPAIGN,
+    CHANNEL_EXPANSION,
+    COACH_CALM,
+    COACH_DEMAND,
+    COACH_REFEREE,
+    PRESIDENT_CALM,
+    PRESIDENT_DEMAND,
+    PRESIDENT_REFEREE,
 }
 
 data class PresidentDeskUiState(
@@ -62,6 +72,17 @@ data class PresidentDeskUiState(
     val investorRounds: Int = 0,
     val ipoDone: Boolean = false,
     val pelotazoDone: Boolean = false,
+    val shirtPriceEur: Int = 70,
+    val pressRating: Int = 50,
+    val channelLevel: Int = 45,
+    val fanMood: Int = 55,
+    val socialMassK: Int = 0,
+    val environment: Int = 50,
+    val marketTrend: Int = 0,
+    val refereeVerdictLabel: String = "Neutro",
+    val refereeBalance: Int = 0,
+    val refereeMoviola: String = "",
+    val lastStatementMatchday: Int = 0,
 )
 
 @HiltViewModel
@@ -132,6 +153,22 @@ class PresidentDeskViewModel @Inject constructor(
                 var rounds = profile.presidentInvestorRounds.coerceAtLeast(0)
                 var ipoDone = profile.presidentIpoDone
                 var pelotazoDone = profile.presidentPelotazoDone
+                val inferredSocialMass = if (profile.marketSocialMassK > 0) {
+                    profile.marketSocialMassK
+                } else {
+                    (team.membersCount / 35).coerceIn(40, 2600)
+                }
+                var shirtPrice = profile.marketShirtPriceEur.coerceIn(25, 180)
+                var press = profile.marketPressRating.coerceIn(0, 100)
+                var channel = profile.marketChannelLevel.coerceIn(0, 100)
+                var mood = profile.marketFanMood.coerceIn(0, 100)
+                var socialMassK = inferredSocialMass
+                var environment = profile.marketEnvironment.coerceIn(0, 100)
+                var trend = profile.marketTrend.coerceIn(-20, 20)
+                var refereeClimate = profile.refereeClimate.coerceIn(-20, 20)
+                val refereeVerdict = profile.refereeLastVerdict.uppercase()
+                val statementAlreadyUsed = profile.marketLastStatementMatchday == state.currentMatchday
+                var lastStatementMatchday = profile.marketLastStatementMatchday
 
                 val resultMessage = when (action) {
                     PresidentAction.PRIVATE_INVESTOR -> {
@@ -191,6 +228,188 @@ class PresidentDeskViewModel @Inject constructor(
                             "Pelotazo inmobiliario aprobado (+${injectionK}K)."
                         }
                     }
+
+                    PresidentAction.SHIRT_PRICE_UP -> {
+                        if (shirtPrice >= 150) {
+                            "No puedes subir mas el precio de la camiseta."
+                        } else {
+                            shirtPrice = (shirtPrice + 5).coerceAtMost(150)
+                            mood = (mood - 1).coerceAtLeast(0)
+                            trend = (trend + 1).coerceAtMost(20)
+                            "Camiseta oficial ajustada a ${shirtPrice}€."
+                        }
+                    }
+
+                    PresidentAction.SHIRT_PRICE_DOWN -> {
+                        if (shirtPrice <= 30) {
+                            "No puedes bajar mas el precio de la camiseta."
+                        } else {
+                            shirtPrice = (shirtPrice - 5).coerceAtLeast(30)
+                            mood = (mood + 1).coerceAtMost(100)
+                            trend = (trend - 1).coerceAtLeast(-20)
+                            "Camiseta oficial rebajada a ${shirtPrice}€."
+                        }
+                    }
+
+                    PresidentAction.PRESS_CAMPAIGN -> {
+                        val costK = maxOf(250, socialMassK / 6)
+                        if (budgetK < costK) {
+                            "Presupuesto insuficiente para campana de prensa (${costK}K)."
+                        } else {
+                            budgetK -= costK
+                            press = (press + 6).coerceAtMost(100)
+                            channel = (channel + 1).coerceAtMost(100)
+                            mood = (mood + 2).coerceAtMost(100)
+                            trend = (trend + 1).coerceAtMost(20)
+                            "Campana de prensa activada (-${costK}K). Reputacion al alza."
+                        }
+                    }
+
+                    PresidentAction.CHANNEL_EXPANSION -> {
+                        val costK = maxOf(400, socialMassK / 4)
+                        if (budgetK < costK) {
+                            "Presupuesto insuficiente para ampliar el canal (${costK}K)."
+                        } else {
+                            budgetK -= costK
+                            channel = (channel + 7).coerceAtMost(100)
+                            press = (press + 2).coerceAtMost(100)
+                            socialMassK = (socialMassK + 35).coerceAtMost(6000)
+                            environment = (environment + 2).coerceAtMost(100)
+                            "Canal del club reforzado (-${costK}K)."
+                        }
+                    }
+
+                    PresidentAction.COACH_CALM -> {
+                        if (statementAlreadyUsed) {
+                            "Ya has hecho declaraciones esta jornada."
+                        } else {
+                            val successChance = (58 + press / 5 + channel / 8 - pressure).coerceIn(25, 85)
+                            val success = rng.nextInt(100) < successChance
+                            lastStatementMatchday = state.currentMatchday
+                            if (success) {
+                                mood = (mood + 2).coerceAtMost(100)
+                                trend = (trend + 1).coerceAtMost(20)
+                                pressure = (pressure - 1).coerceAtLeast(0)
+                                "Entrenador: mensaje de calma bien recibido."
+                            } else {
+                                mood = (mood - 1).coerceAtLeast(0)
+                                trend = (trend - 1).coerceAtLeast(-20)
+                                "Entrenador: mensaje de calma percibido como debilidad."
+                            }
+                        }
+                    }
+
+                    PresidentAction.COACH_DEMAND -> {
+                        if (statementAlreadyUsed) {
+                            "Ya has hecho declaraciones esta jornada."
+                        } else {
+                            val successChance = (52 + press / 6 + mood / 8 - 8).coerceIn(20, 78)
+                            val success = rng.nextInt(100) < successChance
+                            lastStatementMatchday = state.currentMatchday
+                            if (success) {
+                                mood = (mood + 3).coerceAtMost(100)
+                                trend = (trend + 1).coerceAtMost(20)
+                                pressure = (pressure - 1).coerceAtLeast(0)
+                                "Entrenador: discurso exigente activa a la plantilla."
+                            } else {
+                                mood = (mood - 2).coerceAtLeast(0)
+                                pressure = (pressure + 1).coerceAtMost(12)
+                                "Entrenador: discurso exigente genera friccion interna."
+                            }
+                        }
+                    }
+
+                    PresidentAction.COACH_REFEREE -> {
+                        if (statementAlreadyUsed) {
+                            "Ya has hecho declaraciones esta jornada."
+                        } else {
+                            val base = when (refereeVerdict) {
+                                "HARMED" -> 66
+                                "FAVORED" -> 28
+                                else -> 46
+                            }
+                            val successChance = (base + press / 6 + channel / 10).coerceIn(18, 82)
+                            val success = rng.nextInt(100) < successChance
+                            lastStatementMatchday = state.currentMatchday
+                            if (success) {
+                                press = (press + 2).coerceAtMost(100)
+                                mood = (mood + 1).coerceAtMost(100)
+                                refereeClimate = (refereeClimate - 2).coerceAtLeast(-20)
+                                "Entrenador: queja arbitral con apoyo mediatico."
+                            } else {
+                                press = (press - 3).coerceAtLeast(0)
+                                mood = (mood - 2).coerceAtLeast(0)
+                                pressure = (pressure + 1).coerceAtMost(12)
+                                refereeClimate = (refereeClimate - 4).coerceAtLeast(-20)
+                                "Entrenador: queja arbitral vista como excusa."
+                            }
+                        }
+                    }
+
+                    PresidentAction.PRESIDENT_CALM -> {
+                        if (statementAlreadyUsed) {
+                            "Ya has hecho declaraciones esta jornada."
+                        } else {
+                            val successChance = (56 + press / 6 + channel / 8 - pressure / 2).coerceIn(22, 80)
+                            val success = rng.nextInt(100) < successChance
+                            lastStatementMatchday = state.currentMatchday
+                            if (success) {
+                                pressure = (pressure - 1).coerceAtLeast(0)
+                                mood = (mood + 1).coerceAtMost(100)
+                                "Presidente: discurso institucional que enfria el ruido."
+                            } else {
+                                pressure = (pressure + 1).coerceAtMost(12)
+                                press = (press - 1).coerceAtLeast(0)
+                                "Presidente: discurso institucional sin impacto."
+                            }
+                        }
+                    }
+
+                    PresidentAction.PRESIDENT_DEMAND -> {
+                        if (statementAlreadyUsed) {
+                            "Ya has hecho declaraciones esta jornada."
+                        } else {
+                            val successChance = (50 + press / 7 - 6).coerceIn(18, 74)
+                            val success = rng.nextInt(100) < successChance
+                            lastStatementMatchday = state.currentMatchday
+                            if (success) {
+                                mood = (mood + 2).coerceAtMost(100)
+                                pressure = (pressure - 1).coerceAtLeast(0)
+                                trend = (trend + 1).coerceAtMost(20)
+                                "Presidente: exigencia publica que activa al club."
+                            } else {
+                                mood = (mood - 2).coerceAtLeast(0)
+                                pressure = (pressure + 2).coerceAtMost(12)
+                                "Presidente: exceso de presion, efecto rebote."
+                            }
+                        }
+                    }
+
+                    PresidentAction.PRESIDENT_REFEREE -> {
+                        if (statementAlreadyUsed) {
+                            "Ya has hecho declaraciones esta jornada."
+                        } else {
+                            val base = when (refereeVerdict) {
+                                "HARMED" -> 62
+                                "FAVORED" -> 24
+                                else -> 42
+                            }
+                            val successChance = (base + press / 8).coerceIn(16, 76)
+                            val success = rng.nextInt(100) < successChance
+                            lastStatementMatchday = state.currentMatchday
+                            if (success) {
+                                press = (press + 1).coerceAtMost(100)
+                                pressure = (pressure - 1).coerceAtLeast(0)
+                                refereeClimate = (refereeClimate - 3).coerceAtLeast(-20)
+                                "Presidente: denuncia arbitral con eco en moviola."
+                            } else {
+                                press = (press - 3).coerceAtLeast(0)
+                                pressure = (pressure + 1).coerceAtMost(12)
+                                refereeClimate = (refereeClimate - 5).coerceAtLeast(-20)
+                                "Presidente: ataque al arbitraje sale cruz."
+                            }
+                        }
+                    }
                 }
 
                 val updatedState = profile.copy(
@@ -201,6 +420,15 @@ class PresidentDeskViewModel @Inject constructor(
                     presidentInvestorRounds = rounds,
                     presidentIpoDone = ipoDone,
                     presidentPelotazoDone = pelotazoDone,
+                    marketShirtPriceEur = shirtPrice,
+                    marketPressRating = press,
+                    marketChannelLevel = channel,
+                    marketFanMood = mood,
+                    marketSocialMassK = socialMassK,
+                    marketEnvironment = environment,
+                    marketTrend = trend,
+                    marketLastStatementMatchday = lastStatementMatchday,
+                    refereeClimate = refereeClimate.coerceIn(-20, 20),
                 )
                 seasonStateDao.update(updatedState)
                 teamDao.update(team.copy(budgetK = budgetK.coerceAtLeast(0)))
@@ -271,6 +499,21 @@ class PresidentDeskViewModel @Inject constructor(
                         investorRounds = normalized.presidentInvestorRounds.coerceAtLeast(0),
                         ipoDone = normalized.presidentIpoDone,
                         pelotazoDone = normalized.presidentPelotazoDone,
+                        shirtPriceEur = normalized.marketShirtPriceEur.coerceIn(25, 180),
+                        pressRating = normalized.marketPressRating.coerceIn(0, 100),
+                        channelLevel = normalized.marketChannelLevel.coerceIn(0, 100),
+                        fanMood = normalized.marketFanMood.coerceIn(0, 100),
+                        socialMassK = if (normalized.marketSocialMassK > 0) {
+                            normalized.marketSocialMassK
+                        } else {
+                            (team.membersCount / 35).coerceIn(40, 2600)
+                        },
+                        environment = normalized.marketEnvironment.coerceIn(0, 100),
+                        marketTrend = normalized.marketTrend.coerceIn(-20, 20),
+                        refereeVerdictLabel = refereeVerdictLabel(normalized.refereeLastVerdict),
+                        refereeBalance = normalized.refereeLastBalance.coerceIn(-6, 6),
+                        refereeMoviola = normalized.refereeLastMoviola.ifBlank { "Sin informe arbitral reciente." },
+                        lastStatementMatchday = normalized.marketLastStatementMatchday.coerceAtLeast(0),
                     )
                 }.onFailure { e ->
                     _uiState.value = PresidentDeskUiState(
@@ -299,7 +542,24 @@ class PresidentDeskViewModel @Inject constructor(
             presidentInvestorRounds = state.presidentInvestorRounds.coerceAtLeast(0),
             presidentLastReviewMatchday = state.presidentLastReviewMatchday.coerceAtLeast(0),
             presidentNextReviewMatchday = state.presidentNextReviewMatchday.coerceAtLeast(1),
+            marketShirtPriceEur = state.marketShirtPriceEur.coerceIn(25, 180),
+            marketPressRating = state.marketPressRating.coerceIn(0, 100),
+            marketChannelLevel = state.marketChannelLevel.coerceIn(0, 100),
+            marketFanMood = state.marketFanMood.coerceIn(0, 100),
+            marketSocialMassK = state.marketSocialMassK.coerceAtLeast(0),
+            marketEnvironment = state.marketEnvironment.coerceIn(0, 100),
+            marketTrend = state.marketTrend.coerceIn(-20, 20),
+            marketLastStatementMatchday = state.marketLastStatementMatchday.coerceAtLeast(0),
+            refereeClimate = state.refereeClimate.coerceIn(-20, 20),
+            refereeLastBalance = state.refereeLastBalance.coerceIn(-6, 6),
+            refereeLastRandomBias = state.refereeLastRandomBias.coerceIn(-4, 4),
         )
+    }
+
+    private fun refereeVerdictLabel(raw: String): String = when (raw.uppercase()) {
+        "FAVORED" -> "Beneficiado"
+        "HARMED" -> "Perjudicado"
+        else -> "Neutro"
     }
 
     private fun actionRng(

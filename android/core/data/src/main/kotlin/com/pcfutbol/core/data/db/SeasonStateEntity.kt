@@ -44,6 +44,22 @@ data class SeasonStateEntity(
     val presidentLastReviewMatchday: Int = 0,
     val presidentNextReviewMatchday: Int = 1,
     val presidentLastCapPenaltyMatchday: Int = -99,
+    // Dinamica de mercado/entorno (capa manager moderna)
+    val marketShirtPriceEur: Int = 70,
+    val marketPressRating: Int = 50, // 0..100
+    val marketChannelLevel: Int = 45, // 0..100
+    val marketFanMood: Int = 55, // 0..100
+    val marketSocialMassK: Int = 0, // miles de aficionados activos
+    val marketEnvironment: Int = 50, // 0..100 (entorno local)
+    val marketTrend: Int = 0, // -20..20
+    val marketLastEventMatchday: Int = 0,
+    val marketLastStatementMatchday: Int = 0,
+    // Ultimo informe arbitral/moviola (perspectiva del manager)
+    val refereeLastBalance: Int = 0, // >0 beneficiado, <0 perjudicado
+    val refereeLastVerdict: String = "NEUTRAL", // FAVORED | HARMED | NEUTRAL
+    val refereeLastMoviola: String = "",
+    val refereeClimate: Int = 0, // -20..20 (relacion con arbitraje)
+    val refereeLastRandomBias: Int = 0, // componente aleatorio del ultimo partido
 )
 
 val SeasonStateEntity.managerLeague: String
