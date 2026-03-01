@@ -73,6 +73,7 @@ class Player:
     slot_id:   int
     team_name: str
     comp:      str
+    citizenship: str
     name:      str
     position:  str
     age:       int
@@ -172,6 +173,21 @@ def load_teams() -> dict[str, Team]:
     teams: dict[str, Team] = {}  # key = slot_id str
     players_by_team: dict[str, list[Player]] = {}
 
+    def infer_country_from_comp(comp_code: str) -> str:
+        if comp_code in ("ES1", "ES2", "E3G1", "E3G2"):
+            return "ES"
+        mapping = {
+            "GB1": "GB",
+            "IT1": "IT",
+            "L1": "DE",
+            "FR1": "FR",
+            "NL1": "NL",
+            "PO1": "PT",
+            "BE1": "BE",
+            "TR1": "TR",
+        }
+        return mapping.get(comp_code, "")
+
     if not PLAYERS_CSV.exists():
         print(f"[ERROR] No se encuentra el CSV: {PLAYERS_CSV}")
         sys.exit(1)
@@ -190,10 +206,14 @@ def load_teams() -> dict[str, Team]:
                 players_by_team[key] = []
 
             try:
+                citizenship = str(row.get("citizenship", "")).upper()[:2]
+                if not citizenship:
+                    citizenship = infer_country_from_comp(comp)
                 p = Player(
                     slot_id   = slot,
                     team_name = row["teamName"],
                     comp      = comp,
+                    citizenship = citizenship,
                     name      = row["playerName"],
                     position  = row["position"],
                     age       = int(row["age"]),
@@ -1024,6 +1044,11 @@ def _ensure_manager_depth(data: dict):
     if not isinstance(manager, dict):
         manager = {}
         data["manager"] = manager
+    manager.setdefault("name", "Manager")
+    manager["prestige"] = max(1, _safe_int(manager.get("prestige", 1), 1))
+    manager["total_seasons"] = max(0, _safe_int(manager.get("total_seasons", 0), 0))
+    if not isinstance(manager.get("history"), list):
+        manager["history"] = []
 
     raw_staff = manager.get("staff", {})
     if not isinstance(raw_staff, dict):
@@ -1107,6 +1132,7 @@ def _player_snapshot_from_team_player(player: Player, team: Team, season_year: i
     return {
         "name": player.name,
         "position": player.position,
+        "citizenship": player.citizenship,
         "birth_year": birth_year,
         "me": player.me,
         "ve": player.ve,
@@ -1121,6 +1147,7 @@ def _player_snapshot_from_team_player(player: Player, team: Team, season_year: i
         "portero": player.portero,
         "market_value": player.market_value,
         "team_slot_id": team.slot_id,
+        "team_comp": team.comp,
         "status": "OK",
     }
 
@@ -2871,6 +2898,833 @@ def _play_copa_round(
     return matches
 
 
+# ---- UEFA competitions ----------------------------------------------------
+
+EURO_COMPETITIONS: list[tuple[str, str]] = [
+    ("CEURO", "CHAMPIONS"),
+    ("RECOPA", "EUROPA LEAGUE"),
+    ("CUEFA", "CONFERENCE"),
+]
+
+EURO_ROUND_ORDER: list[str] = [
+    "LP1", "LP2", "LP3", "LP4", "LP5", "LP6", "LP7", "LP8",
+    "POF1", "POF2",
+    "R16_1", "R16_2",
+    "QF1", "QF2",
+    "SF1", "SF2",
+    "F",
+]
+
+EURO_LEAGUE_PRIORITY = [
+    "ES1", "GB1", "IT1", "L1", "FR1", "NL1", "PO1", "BE1", "TR1",
+    "ES2", "E3G1", "E3G2",
+]
+
+
+def _euro_comp_name(code: str) -> str:
+    return dict(EURO_COMPETITIONS).get(code, code)
+
+
+def _euro_round_label(round_code: str) -> str:
+    if round_code.startswith("LP"):
+        return f"LEAGUE PHASE {round_code[2:]}"
+    labels = {
+        "POF1": "PLAYOFF IDA",
+        "POF2": "PLAYOFF VUELTA",
+        "R16_1": "OCTAVOS IDA",
+        "R16_2": "OCTAVOS VUELTA",
+        "QF1": "CUARTOS IDA",
+        "QF2": "CUARTOS VUELTA",
+        "SF1": "SEMIFINAL IDA",
+        "SF2": "SEMIFINAL VUELTA",
+        "F": "FINAL",
+    }
+    return labels.get(round_code, round_code)
+
+
+def _euro_empty_table_row() -> dict:
+    return {"played": 0, "won": 0, "drawn": 0, "lost": 0, "gf": 0, "ga": 0, "pts": 0}
+
+
+def _build_euro_schedule(total_matchdays: int) -> list[int]:
+    start = 2
+    end = max(start + len(EURO_ROUND_ORDER) - 1, total_matchdays - 3)
+    end = min(total_matchdays, end)
+    if end <= start:
+        return [min(total_matchdays, start + i) for i in range(len(EURO_ROUND_ORDER))]
+
+    step = (end - start) / float(max(1, len(EURO_ROUND_ORDER) - 1))
+    out: list[int] = []
+    prev = 0
+    for idx in range(len(EURO_ROUND_ORDER)):
+        md = int(round(start + idx * step))
+        md = max(1, min(total_matchdays, md))
+        if md <= prev:
+            md = min(total_matchdays, prev + 1)
+        out.append(md)
+        prev = md
+    return out
+
+
+def _ranked_euro_pool(teams_by_slot: dict[int, Team]) -> list[int]:
+    by_comp: dict[str, list[Team]] = {}
+    for team in teams_by_slot.values():
+        by_comp.setdefault(team.comp, []).append(team)
+
+    ranked_by_comp: dict[str, list[Team]] = {}
+    for comp, teams in by_comp.items():
+        ranked_by_comp[comp] = sorted(teams, key=lambda t: t.strength(), reverse=True)
+
+    pool: list[int] = []
+    seen: set[int] = set()
+    max_depth = max((len(v) for v in ranked_by_comp.values()), default=0)
+
+    for depth in range(max_depth):
+        for comp in EURO_LEAGUE_PRIORITY:
+            team = ranked_by_comp.get(comp, [])
+            if depth >= len(team):
+                continue
+            slot = team[depth].slot_id
+            if slot not in seen:
+                pool.append(slot)
+                seen.add(slot)
+
+    fallback = sorted(teams_by_slot.values(), key=lambda t: t.strength(), reverse=True)
+    for team in fallback:
+        if team.slot_id not in seen:
+            pool.append(team.slot_id)
+            seen.add(team.slot_id)
+    return pool
+
+
+def _build_league_phase_pairings(participants: list[int], seed: int) -> dict[str, list[list[int]]]:
+    unique = list(dict.fromkeys(participants))
+    if len(unique) % 2 == 1:
+        unique = unique[:-1]
+    if len(unique) < 2:
+        return {}
+
+    used_pairs: set[tuple[int, int]] = set()
+    pairings: dict[str, list[list[int]]] = {}
+
+    for round_idx in range(1, 9):
+        round_code = f"LP{round_idx}"
+        best_pairs: list[list[int]] = []
+        best_dupes = 10**9
+
+        for attempt in range(50):
+            rng = random.Random(seed ^ (round_idx * 4099) ^ (attempt * 1315423911))
+            order = unique[:]
+            rng.shuffle(order)
+            pairs: list[list[int]] = []
+            dupes = 0
+
+            while len(order) >= 2:
+                a = order.pop(0)
+                partner_idx = 0
+                found_fresh = False
+                for idx, b in enumerate(order):
+                    key = (a, b) if a < b else (b, a)
+                    if key not in used_pairs:
+                        partner_idx = idx
+                        found_fresh = True
+                        break
+                b = order.pop(partner_idx)
+                if not found_fresh:
+                    dupes += 1
+                if (round_idx + len(pairs)) % 2 == 0:
+                    home, away = a, b
+                else:
+                    home, away = b, a
+                pairs.append([home, away])
+
+            if dupes < best_dupes:
+                best_dupes = dupes
+                best_pairs = pairs
+            if dupes == 0:
+                break
+
+        pairings[round_code] = best_pairs
+        for home, away in best_pairs:
+            key = (home, away) if home < away else (away, home)
+            used_pairs.add(key)
+
+    return pairings
+
+
+def _tie_key(a: int, b: int) -> tuple[int, int]:
+    return (a, b) if a < b else (b, a)
+
+
+def _goals_for_team(match: dict, team_id: int) -> int:
+    if int(match.get("home", -1)) == team_id:
+        return int(match.get("hg", 0))
+    if int(match.get("away", -1)) == team_id:
+        return int(match.get("ag", 0))
+    return 0
+
+
+def _euro_table_ranking(comp_state: dict, teams_by_slot: dict[int, Team]) -> list[int]:
+    table = comp_state.get("table", {})
+    participants = [int(x) for x in comp_state.get("participants", []) if int(x) in teams_by_slot]
+
+    def sort_key(slot_id: int):
+        row = table.get(str(slot_id), _euro_empty_table_row())
+        gd = int(row.get("gf", 0)) - int(row.get("ga", 0))
+        strength = teams_by_slot[slot_id].strength() if slot_id in teams_by_slot else 0.0
+        return (-int(row.get("pts", 0)), -gd, -int(row.get("gf", 0)), -strength, teams_by_slot[slot_id].name if slot_id in teams_by_slot else "")
+
+    return sorted(participants, key=sort_key)
+
+
+def _euro_two_leg_winners(comp_state: dict, first_leg: str, second_leg: str, seed: int) -> list[int]:
+    results = comp_state.get("results_by_round", {})
+    first = list(results.get(first_leg, []))
+    second = list(results.get(second_leg, []))
+    if not first or not second:
+        return []
+
+    second_map = {
+        _tie_key(int(m.get("home", -1)), int(m.get("away", -1))): m
+        for m in second
+    }
+    winners: list[int] = []
+
+    for idx, m1 in enumerate(first):
+        a = int(m1.get("home", -1))
+        b = int(m1.get("away", -1))
+        m2 = second_map.get(_tie_key(a, b))
+        if not m2:
+            continue
+        a_goals = _goals_for_team(m1, a) + _goals_for_team(m2, a)
+        b_goals = _goals_for_team(m1, b) + _goals_for_team(m2, b)
+        if a_goals > b_goals:
+            winner = a
+        elif b_goals > a_goals:
+            winner = b
+        else:
+            rng = random.Random(seed ^ (idx * 1013904223) ^ (a * 911 + b * 3571))
+            winner = a if rng.random() < 0.5 else b
+            if winner == a:
+                m2["penalties"] = " (pen. 5-4)"
+            else:
+                m2["penalties"] = " (pen. 4-5)"
+            m2["winner"] = winner
+        winners.append(winner)
+
+    return winners
+
+
+def _ensure_comp_fixtures(
+    comp_state: dict,
+    round_code: str,
+    seed: int,
+    teams_by_slot: dict[int, Team],
+) -> list[dict]:
+    fixtures = comp_state.setdefault("fixtures", {})
+    if round_code in fixtures:
+        return list(fixtures.get(round_code, []))
+
+    if round_code.startswith("LP"):
+        lp = comp_state.get("lp_pairings", {})
+        round_pairs = lp.get(round_code, [])
+        built = [{"home": int(home), "away": int(away), "neutral": False} for home, away in round_pairs]
+        fixtures[round_code] = built
+        return built
+
+    ranking = _euro_table_ranking(comp_state, teams_by_slot)
+
+    if round_code == "POF1":
+        playoff = ranking[8:24]
+        built: list[dict] = []
+        for i in range(8):
+            if i >= len(playoff) or (len(playoff) - 1 - i) < 0:
+                break
+            better = playoff[i]
+            lower = playoff[len(playoff) - 1 - i]
+            built.append({"home": lower, "away": better, "neutral": False})
+        fixtures["POF1"] = built
+        fixtures["POF2"] = [{"home": m["away"], "away": m["home"], "neutral": False} for m in built]
+        return built
+
+    if round_code == "POF2":
+        return list(fixtures.get("POF2", []))
+
+    if round_code == "R16_1":
+        top8 = ranking[:8]
+        playoff_winners = _euro_two_leg_winners(comp_state, "POF1", "POF2", seed ^ 0x120F12)
+        rng = random.Random(seed ^ 0x55AA)
+        rng.shuffle(playoff_winners)
+        built: list[dict] = []
+        for seeded, challenger in zip(top8, playoff_winners[:8]):
+            built.append({"home": challenger, "away": seeded, "neutral": False})
+        fixtures["R16_1"] = built
+        fixtures["R16_2"] = [{"home": m["away"], "away": m["home"], "neutral": False} for m in built]
+        return built
+
+    if round_code == "R16_2":
+        return list(fixtures.get("R16_2", []))
+
+    if round_code == "QF1":
+        winners = _euro_two_leg_winners(comp_state, "R16_1", "R16_2", seed ^ 0x44DD)
+        rng = random.Random(seed ^ 0x11BB)
+        rng.shuffle(winners)
+        built: list[dict] = []
+        for i in range(0, len(winners), 2):
+            if i + 1 >= len(winners):
+                break
+            a = winners[i]
+            b = winners[i + 1]
+            home, away = (a, b) if rng.random() < 0.5 else (b, a)
+            built.append({"home": home, "away": away, "neutral": False})
+        fixtures["QF1"] = built
+        fixtures["QF2"] = [{"home": m["away"], "away": m["home"], "neutral": False} for m in built]
+        return built
+
+    if round_code == "QF2":
+        return list(fixtures.get("QF2", []))
+
+    if round_code == "SF1":
+        winners = _euro_two_leg_winners(comp_state, "QF1", "QF2", seed ^ 0x2288)
+        rng = random.Random(seed ^ 0x3377)
+        rng.shuffle(winners)
+        built: list[dict] = []
+        for i in range(0, len(winners), 2):
+            if i + 1 >= len(winners):
+                break
+            a = winners[i]
+            b = winners[i + 1]
+            home, away = (a, b) if rng.random() < 0.5 else (b, a)
+            built.append({"home": home, "away": away, "neutral": False})
+        fixtures["SF1"] = built
+        fixtures["SF2"] = [{"home": m["away"], "away": m["home"], "neutral": False} for m in built]
+        return built
+
+    if round_code == "SF2":
+        return list(fixtures.get("SF2", []))
+
+    if round_code == "F":
+        finalists = _euro_two_leg_winners(comp_state, "SF1", "SF2", seed ^ 0x7F7F7F)
+        if len(finalists) >= 2:
+            fixtures["F"] = [{"home": finalists[0], "away": finalists[1], "neutral": True}]
+        else:
+            fixtures["F"] = []
+        return list(fixtures["F"])
+
+    return []
+
+
+def _init_euro_state(data: dict, teams_by_slot: dict[int, Team], total_matchdays: int) -> dict:
+    season_seed = int(data.get("season_seed", 0))
+    season = str(data.get("season", "2025-26"))
+    schedule = _build_euro_schedule(total_matchdays)
+    pool = _ranked_euro_pool(teams_by_slot)
+    used: set[int] = set()
+    cursor = 0
+    competitions: dict[str, dict] = {}
+
+    for idx, (code, _) in enumerate(EURO_COMPETITIONS):
+        participants: list[int] = []
+        while cursor < len(pool) and len(participants) < 36:
+            sid = int(pool[cursor])
+            cursor += 1
+            if sid in used:
+                continue
+            participants.append(sid)
+            used.add(sid)
+        if len(participants) < 36:
+            fallback = sorted(teams_by_slot.values(), key=lambda t: t.strength(), reverse=True)
+            for team in fallback:
+                if team.slot_id in used:
+                    continue
+                participants.append(team.slot_id)
+                used.add(team.slot_id)
+                if len(participants) >= 36:
+                    break
+
+        lp_seed = season_seed ^ (idx * 2654435761)
+        competitions[code] = {
+            "participants": participants,
+            "round_index": 0,
+            "rounds": [],
+            "champion": None,
+            "table": {str(sid): _euro_empty_table_row() for sid in participants},
+            "lp_pairings": _build_league_phase_pairings(participants, lp_seed),
+            "fixtures": {},
+            "results_by_round": {},
+        }
+
+    return {
+        "season": season,
+        "schedule": schedule,
+        "competitions": competitions,
+    }
+
+
+def _active_euro_round_labels(euro_state: dict, md: int) -> list[str]:
+    if not isinstance(euro_state, dict):
+        return []
+    schedule = list(euro_state.get("schedule", []))
+    comps = euro_state.get("competitions", {})
+    labels: list[str] = []
+    for code, _ in EURO_COMPETITIONS:
+        state = comps.get(code, {})
+        idx = int(state.get("round_index", 0))
+        if idx >= len(EURO_ROUND_ORDER) or idx >= len(schedule):
+            continue
+        if int(schedule[idx]) != md:
+            continue
+        labels.append(f"{_euro_comp_name(code)}: {_euro_round_label(EURO_ROUND_ORDER[idx])}")
+    return labels
+
+
+def _play_euro_round(
+    data: dict,
+    md: int,
+    teams_by_slot: dict[int, Team],
+    mgr_slot: int,
+    show_output: bool = False,
+):
+    euro = data.get("euro")
+    if not isinstance(euro, dict):
+        return
+
+    schedule = list(euro.get("schedule", []))
+    comps = euro.get("competitions", {})
+    season_seed = int(data.get("season_seed", 0))
+    tactic = data.get("tactic")
+    news = data.setdefault("news", [])
+
+    for comp_idx, (code, _) in enumerate(EURO_COMPETITIONS):
+        comp = comps.get(code)
+        if not isinstance(comp, dict):
+            continue
+        idx = int(comp.get("round_index", 0))
+        if idx >= len(EURO_ROUND_ORDER) or idx >= len(schedule):
+            continue
+        if int(schedule[idx]) != md:
+            continue
+
+        round_code = EURO_ROUND_ORDER[idx]
+        round_label = _euro_round_label(round_code)
+        fixtures = _ensure_comp_fixtures(
+            comp_state=comp,
+            round_code=round_code,
+            seed=season_seed ^ (comp_idx * 9187) ^ (idx * 1299721),
+            teams_by_slot=teams_by_slot,
+        )
+        if not fixtures:
+            comp["round_index"] = idx + 1
+            continue
+
+        round_results: list[dict] = []
+        for fix_idx, fix in enumerate(fixtures):
+            home_id = int(fix.get("home", -1))
+            away_id = int(fix.get("away", -1))
+            neutral = bool(fix.get("neutral", False))
+            home = teams_by_slot.get(home_id)
+            away = teams_by_slot.get(away_id)
+            if not home or not away:
+                continue
+
+            match_seed = season_seed ^ (md * 10007) ^ (home_id * 31 + away_id * 17) ^ (fix_idx * 1009)
+            ht = tactic if home_id == mgr_slot else None
+            at = tactic if away_id == mgr_slot else None
+            hg, ag = simulate_match(home, away, match_seed, home_tactic=ht, away_tactic=at)
+            item = {
+                "home": home_id,
+                "away": away_id,
+                "hg": hg,
+                "ag": ag,
+                "neutral": neutral,
+                "penalties": "",
+            }
+
+            if round_code == "F" and hg == ag:
+                rng = random.Random(match_seed ^ 0x4242)
+                home_wins = rng.random() < 0.5
+                item["winner"] = home_id if home_wins else away_id
+                item["penalties"] = " (pen. 5-4)" if home_wins else " (pen. 4-5)"
+
+            round_results.append(item)
+
+            if round_code.startswith("LP"):
+                table = comp.setdefault("table", {})
+                home_row = table.setdefault(str(home_id), _euro_empty_table_row())
+                away_row = table.setdefault(str(away_id), _euro_empty_table_row())
+                home_row["played"] += 1
+                away_row["played"] += 1
+                home_row["gf"] += hg
+                home_row["ga"] += ag
+                away_row["gf"] += ag
+                away_row["ga"] += hg
+                if hg > ag:
+                    home_row["won"] += 1
+                    away_row["lost"] += 1
+                    home_row["pts"] += 3
+                elif ag > hg:
+                    away_row["won"] += 1
+                    home_row["lost"] += 1
+                    away_row["pts"] += 3
+                else:
+                    home_row["drawn"] += 1
+                    away_row["drawn"] += 1
+                    home_row["pts"] += 1
+                    away_row["pts"] += 1
+
+        if not round_results:
+            comp["round_index"] = idx + 1
+            continue
+
+        results_by_round = comp.setdefault("results_by_round", {})
+        results_by_round[round_code] = round_results
+        comp.setdefault("rounds", []).append(
+            {"md": md, "label": round_label, "round": round_code, "matches": round_results}
+        )
+        comp["round_index"] = idx + 1
+
+        if round_code == "F":
+            final = round_results[0]
+            if "winner" in final:
+                winner = int(final.get("winner", -1))
+            elif int(final.get("hg", 0)) > int(final.get("ag", 0)):
+                winner = int(final.get("home", -1))
+            else:
+                winner = int(final.get("away", -1))
+            comp["champion"] = winner
+
+        mgr_match = next((m for m in round_results if int(m.get("home", -1)) == mgr_slot or int(m.get("away", -1)) == mgr_slot), None)
+        if mgr_match:
+            h_name = teams_by_slot.get(int(mgr_match["home"])).name
+            a_name = teams_by_slot.get(int(mgr_match["away"])).name
+            news.append(
+                f"J{md}: {_euro_comp_name(code)} {round_label} - "
+                f"{h_name} {mgr_match['hg']}-{mgr_match['ag']} {a_name}{mgr_match.get('penalties', '')}"
+            )
+        champion_slot = _safe_int(comp.get("champion", -1), -1)
+        if champion_slot == mgr_slot:
+            news.append(f"J{md}: {teams_by_slot[mgr_slot].name} gana {_euro_comp_name(code)}.")
+
+        if show_output:
+            print(_c(BOLD + YELLOW, f"\n  UEFA · {_euro_comp_name(code)} · {round_label}"))
+            for m in round_results:
+                h_name = teams_by_slot[int(m["home"])].name
+                a_name = teams_by_slot[int(m["away"])].name
+                print(f"  {h_name:<22} {m['hg']:>2} - {m['ag']:<2} {a_name}{m.get('penalties', '')}")
+            print()
+
+    data["euro"] = euro
+    _save_career(data)
+
+
+def _show_euro_status(data: dict, teams_by_slot: dict[int, Team], mgr_slot: int):
+    euro = data.get("euro")
+    if not isinstance(euro, dict):
+        print(_c(GRAY, "\n  Competiciones UEFA no inicializadas.\n"))
+        return
+
+    schedule = list(euro.get("schedule", []))
+    comps = euro.get("competitions", {})
+    print(_c(BOLD + YELLOW, "\n  ═══ COMPETICIONES UEFA (FORMATO MODERNO) ═══"))
+    for code, _ in EURO_COMPETITIONS:
+        comp = comps.get(code, {})
+        idx = int(comp.get("round_index", 0))
+        champion = _safe_int(comp.get("champion", -1), -1)
+        if champion in teams_by_slot:
+            status = f"CAMPEON: {teams_by_slot[champion].name}"
+        elif idx >= len(EURO_ROUND_ORDER):
+            status = "FINALIZADO"
+        else:
+            rd = EURO_ROUND_ORDER[idx]
+            md = schedule[idx] if idx < len(schedule) else "-"
+            status = f"Siguiente: {_euro_round_label(rd)} (J{md})"
+        print(_c(CYAN, f"  {dict(EURO_COMPETITIONS).get(code, code)}"))
+        print(f"    {status}")
+
+        if idx <= 8:
+            ranking = _euro_table_ranking(comp, teams_by_slot)[:8]
+            if ranking:
+                leaders = ", ".join(teams_by_slot[s].name for s in ranking[:4] if s in teams_by_slot)
+                print(_c(GRAY, f"    Top 4 fase liga: {leaders}"))
+        if champion == mgr_slot:
+            print(_c(GREEN, "    Tu equipo es el campeon."))
+    print()
+
+
+# ---- National team --------------------------------------------------------
+
+NATIONAL_STAGES = ["CUARTOS", "SEMIFINAL", "FINAL"]
+NATIONAL_EURO_RIVALS = ["Alemania", "Francia", "Inglaterra", "Italia", "Portugal", "Paises Bajos", "Croacia"]
+NATIONAL_WORLD_RIVALS = ["Alemania", "Francia", "Brasil", "Argentina", "Inglaterra", "Italia", "Portugal"]
+
+
+def _national_window_index(md: int) -> int:
+    if 13 <= md <= 14:
+        return 1
+    if 26 <= md <= 27:
+        return 2
+    return 0
+
+
+def _poisson_goals_std(lambda_value: float, rng: random.Random) -> int:
+    lam = max(0.1, float(lambda_value))
+    floor = math.exp(-lam)
+    p = 1.0
+    goals = -1
+    while p > floor:
+        p *= rng.random()
+        goals += 1
+        if goals >= 7:
+            break
+    return max(0, min(6, goals))
+
+
+def _national_player_score(player: dict) -> float:
+    ca = float(player.get("ca", 50))
+    media = (
+        float(player.get("ve", 50))
+        + float(player.get("re", 50))
+        + float(player.get("ag", 50))
+        + float(player.get("remate", 50))
+        + float(player.get("regate", 50))
+        + float(player.get("pase", 50))
+        + float(player.get("tiro", 50))
+        + float(player.get("entrada", 50))
+        + float(player.get("portero", 0))
+    ) / 9.0
+    return ca + media
+
+
+def _build_national_squad(data: dict, teams_by_slot: dict[int, Team], limit: int = 23) -> list[dict]:
+    players = data.get("players", [])
+    if not isinstance(players, list):
+        return []
+
+    enriched: list[dict] = []
+    for raw in players:
+        if not isinstance(raw, dict):
+            continue
+        if str(raw.get("status", "OK")).upper() == "RETIRED":
+            continue
+        team_slot = int(raw.get("team_slot_id", -1))
+        team = teams_by_slot.get(team_slot)
+        team_comp = str(raw.get("team_comp", team.comp if team else ""))
+        team_name = team.name if team else "Sin club"
+        citizenship = str(raw.get("citizenship", "")).upper().strip()
+        if not citizenship and team:
+            src_name = str(raw.get("name", ""))
+            match = next((p for p in team.players if p.name == src_name), None)
+            if match:
+                citizenship = str(match.citizenship).upper().strip()
+        item = dict(raw)
+        item["team_comp"] = team_comp
+        item["team_name"] = team_name
+        item["citizenship"] = citizenship
+        item["score"] = _national_player_score(raw)
+        enriched.append(item)
+
+    spanish_liga1 = [
+        p for p in enriched
+        if str(p.get("citizenship", "")).upper() == "ES" and str(p.get("team_comp", "")) == "ES1"
+    ]
+    spanish_all = [p for p in enriched if str(p.get("citizenship", "")).upper() == "ES"]
+    base_pool = spanish_liga1 if spanish_liga1 else spanish_all
+    if len(base_pool) < limit:
+        names = {str(p.get("name", "")) for p in base_pool}
+        for p in spanish_all:
+            if str(p.get("name", "")) not in names:
+                base_pool.append(p)
+                names.add(str(p.get("name", "")))
+            if len(base_pool) >= limit:
+                break
+    if len(base_pool) < limit:
+        names = {str(p.get("name", "")) for p in base_pool}
+        liga1_pool = [p for p in enriched if str(p.get("team_comp", "")) == "ES1"]
+        for p in sorted(liga1_pool, key=lambda x: float(x.get("score", 0.0)), reverse=True):
+            if str(p.get("name", "")) in names:
+                continue
+            base_pool.append(p)
+            names.add(str(p.get("name", "")))
+            if len(base_pool) >= limit:
+                break
+
+    return sorted(base_pool, key=lambda x: float(x.get("score", 0.0)), reverse=True)[:limit]
+
+
+def _ensure_national_state(data: dict):
+    state = data.get("national")
+    season = str(data.get("season", "2025-26"))
+    if not isinstance(state, dict) or str(state.get("season", "")) != season:
+        data["national"] = {"season": season, "windows": {}, "last": None}
+        return
+    state.setdefault("windows", {})
+    state.setdefault("last", None)
+
+
+def _simulate_national_window(
+    data: dict,
+    md: int,
+    teams_by_slot: dict[int, Team],
+    show_output: bool = False,
+    force: bool = False,
+) -> Optional[dict]:
+    window = _national_window_index(md)
+    if window == 0:
+        return None
+
+    _ensure_national_state(data)
+    national = data.get("national", {})
+    season = str(data.get("season", "2025-26"))
+    key = f"{season}:W{window}"
+    windows = national.setdefault("windows", {})
+    if key in windows and not force:
+        return windows.get(key)
+
+    season_year = _season_year(season)
+    tournament = "EUROCOPA" if season_year % 2 == 0 else "MUNDIAL"
+    rivals = NATIONAL_EURO_RIVALS if tournament == "EUROCOPA" else NATIONAL_WORLD_RIVALS
+    rng = random.Random(int(data.get("season_seed", 0)) ^ (window * 1103515245) ^ season_year)
+    opponents = rng.sample(rivals, k=min(3, len(rivals)))
+    while len(opponents) < 3:
+        opponents.append(rivals[len(opponents) % len(rivals)])
+
+    rival_strength = {
+        "Brasil": 86.0,
+        "Francia": 86.0,
+        "Alemania": 86.0,
+        "Argentina": 84.0,
+        "Inglaterra": 84.0,
+        "Italia": 82.0,
+        "Portugal": 82.0,
+        "Paises Bajos": 80.0,
+        "Croacia": 80.0,
+    }
+
+    squad = _build_national_squad(data, teams_by_slot, limit=23)
+    starters = squad[:11]
+    spain_strength = sum(float(p.get("score", 75.0)) for p in starters) / float(max(1, len(starters)))
+    spain_strength = max(55.0, min(95.0, spain_strength))
+
+    eliminated = False
+    champion = False
+    match_lines: list[str] = []
+    for idx, stage in enumerate(NATIONAL_STAGES):
+        opponent = opponents[idx]
+        opp = float(rival_strength.get(opponent, 78.0))
+        goals_es = _poisson_goals_std((spain_strength / 100.0) * 2.15, rng)
+        goals_opp = _poisson_goals_std((opp / 100.0) * 1.95, rng)
+        penalties = ""
+        spain_wins = goals_es > goals_opp
+        if goals_es == goals_opp:
+            pen_es = rng.randint(3, 5) + (1 if spain_strength >= opp else 0)
+            pen_opp = rng.randint(3, 5) + (1 if opp > spain_strength else 0)
+            if pen_es == pen_opp:
+                if rng.random() < 0.5:
+                    pen_es += 1
+                else:
+                    pen_opp += 1
+            penalties = f" (pen {pen_es}-{pen_opp})"
+            spain_wins = pen_es > pen_opp
+        line = f"Espana {goals_es}-{goals_opp} {opponent}{penalties} [{stage}]"
+        match_lines.append(line)
+        if not spain_wins:
+            eliminated = True
+            break
+        if idx == len(NATIONAL_STAGES) - 1:
+            champion = True
+
+    result = {
+        "window": window,
+        "matchday": md,
+        "season": season,
+        "tournament": tournament,
+        "opponents": opponents,
+        "matches": match_lines,
+        "eliminated": eliminated,
+        "champion": champion,
+        "squad": [
+            {
+                "name": p.get("name", "Jugador"),
+                "team": p.get("team_name", "Club"),
+                "score": round(float(p.get("score", 0.0)), 1),
+                "position": p.get("position", "?"),
+            }
+            for p in squad
+        ],
+    }
+
+    windows[key] = result
+    national["last"] = result
+    data["national"] = national
+    news = data.setdefault("news", [])
+    if match_lines:
+        news.append(f"J{md}: Seleccion - {match_lines[-1]}")
+    if champion:
+        news.append(f"J{md}: Espana campeona de {tournament}.")
+    elif eliminated:
+        news.append(f"J{md}: Espana cae en {match_lines[-1].split('[')[-1].rstrip(']')}.")
+
+    if show_output:
+        print(_c(BOLD + YELLOW, f"\n  SELECCION ESPANOLA · {tournament}"))
+        for line in match_lines:
+            print(f"  {line}")
+        if champion:
+            print(_c(GREEN, "  Espana campeona."))
+        elif eliminated:
+            print(_c(RED, "  Espana eliminada."))
+        print()
+
+    _save_career(data)
+    return result
+
+
+def _show_national_team(data: dict, md: int, teams_by_slot: dict[int, Team]):
+    _ensure_national_state(data)
+    season = str(data.get("season", "2025-26"))
+    national = data.get("national", {})
+    window = _national_window_index(md)
+    key = f"{season}:W{window}" if window else ""
+    windows = national.get("windows", {})
+    current_result = windows.get(key) if key else None
+
+    print(_c(BOLD + YELLOW, "\n  ═══ SELECCION ESPANOLA ═══"))
+    print(_c(CYAN, f"  Temporada: {season}"))
+    if window:
+        print(_c(CYAN, f"  Ventana internacional abierta (J{md})"))
+    else:
+        print(_c(GRAY, "  Sin ventana internacional activa (J13-14 y J26-27)."))
+
+    squad = _build_national_squad(data, teams_by_slot, limit=23)
+    if squad:
+        print(_c(GRAY, "  Top convocatoria:"))
+        for idx, p in enumerate(squad[:11], start=1):
+            print(
+                f"   {idx:>2}. {str(p.get('name', 'Jugador'))[:22]:<22} "
+                f"{str(p.get('team_name', 'Club'))[:18]:<18} "
+                f"{float(p.get('score', 0.0)):>5.1f}"
+            )
+    else:
+        print(_c(RED, "  No se pudo construir convocatoria."))
+
+    if current_result:
+        print()
+        print(_c(YELLOW, f"  Torneo: {current_result.get('tournament', '-')}" ))
+        for line in current_result.get("matches", []):
+            print(f"  {line}")
+        if current_result.get("champion"):
+            print(_c(GREEN, "  Resultado: CAMPEON"))
+        elif current_result.get("eliminated"):
+            print(_c(RED, "  Resultado: ELIMINADO"))
+    elif window:
+        print()
+        print(_c(CYAN, "  1. Simular ventana internacional"))
+        print(_c(CYAN, "  0. Volver"))
+        op = input_int("  Opcion: ", 0, 1)
+        if op == 1:
+            _simulate_national_window(data, md, teams_by_slot, show_output=True, force=True)
+    print()
+
+
 # ---- Main season loop ------------------------------------------------------
 
 def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: list[Team] = [],
@@ -2910,6 +3764,10 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
     if not isinstance(data.get("copa"), dict) or data.get("copa", {}).get("season") != data.get("season"):
         data["copa"] = _init_copa_state(data, liga1, liga2)
         _save_career(data)
+    if not isinstance(data.get("euro"), dict) or data.get("euro", {}).get("season") != data.get("season"):
+        data["euro"] = _init_euro_state(data, all_slots, tot_md)
+        _save_career(data)
+    _ensure_national_state(data)
 
     # Build fixture map (deterministic, sorted by slot_id)
     all_fix    = generate_fixtures(comp_t)
@@ -2941,6 +3799,14 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
         if copa_label:
             print(_c(BOLD + CYAN, f"  COPA DEL REY: {copa_label} (ronda activa)"))
             print()
+        euro_labels = _active_euro_round_labels(data.get("euro", {}), cur_md)
+        if euro_labels:
+            for lbl in euro_labels:
+                print(_c(BOLD + CYAN, f"  UEFA: {lbl} (ronda activa)"))
+            print()
+        if _national_window_index(cur_md):
+            print(_c(BOLD + YELLOW, f"  SELECCION ESPANOLA: ventana internacional abierta (J{cur_md})"))
+            print()
 
         tactic  = data.setdefault("tactic", dict(DEFAULT_TACTIC))
         manager_depth = data.get("manager", {})
@@ -2959,9 +3825,11 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
         print(_c(CYAN,  f"  6. Mercado de fichajes {win_tag}"))
         print(_c(CYAN,  "  7. TÃ¡ctica"))
         print(_c(CYAN,  "  8. Entrenamiento y staff"))
+        print(_c(CYAN,  "  9. Competiciones UEFA"))
+        print(_c(CYAN,  " 10. Seleccion espanola"))
         print(_c(CYAN,  "  0. Guardar y salir"))
 
-        op = input_int("  OpciÃ³n: ", 0, 8)
+        op = input_int("  OpciÃ³n: ", 0, 10)
 
         if op == 0:
             data["current_matchday"] = cur_md
@@ -2999,6 +3867,8 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
                     print(_c(YELLOW, f"  ðŸ“° {ni}"))
                 print()
             _play_copa_round(data, cur_md, all_slots, mgr_slot, show_output=True)
+            _play_euro_round(data, cur_md, all_slots, mgr_slot, show_output=True)
+            _simulate_national_window(data, cur_md, all_slots, show_output=True)
             cur_md += 1
             data["current_matchday"] = cur_md
             _save_career(data)
@@ -3029,6 +3899,14 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
         elif op == 8:
             _manager_depth_menu(data)
 
+        elif op == 9:
+            _show_euro_status(data, all_slots, mgr_slot)
+            _pause()
+
+        elif op == 10:
+            _show_national_team(data, cur_md, all_slots)
+            _pause()
+
         elif op == 5:
             print(_c(YELLOW, f"\n  Simulando jornadas {cur_md}â€“{tot_md}..."))
             winter_md = 21 if tot_md >= 42 else max(1, tot_md // 2)
@@ -3058,6 +3936,8 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
                     _save_career(data)
                     _winter_market_menu(data, mgr_team, comp_t, md)
                 _play_copa_round(data, md, all_slots, mgr_slot, show_output=False)
+                _play_euro_round(data, md, all_slots, mgr_slot, show_output=False)
+                _simulate_national_window(data, md, all_slots, show_output=False)
             cur_md = tot_md + 1
             data["current_matchday"] = cur_md
             _save_career(data)
@@ -3115,6 +3995,8 @@ def _setup_season(data: dict, team: Team, liga1: list[Team], liga2: list[Team], 
         "news":             [f"Inicio de temporada {season}. {m['name']} llega a {team.name}."],
         "manager_team":     {"slot_id": team.slot_id, "name": team.name},
         "copa":             None,
+        "euro":             None,
+        "national":         None,
     })
     data.setdefault("players", _build_players_snapshot(liga1, liga2, season))
     _save_career(data)
@@ -3292,4 +4174,3 @@ if __name__ == "__main__":
         for name in ("CYAN", "YELLOW", "GREEN", "RED", "GRAY", "BOLD", "RESET"):
             globals()[name] = ""
     main_menu()
-
