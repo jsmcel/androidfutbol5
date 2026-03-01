@@ -30,7 +30,19 @@ if sys.platform == "win32":
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-ASSETS_DIR = Path(__file__).resolve().parent.parent / "android" / "core" / "data" / "src" / "main" / "assets"
+def _resolve_assets_dir() -> Path:
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parent.parent / "android" / "core" / "data" / "src" / "main" / "assets",
+        here.parent.parent / "core" / "data" / "src" / "main" / "assets",
+    ]
+    for candidate in candidates:
+        if (candidate / "pcf55_players_2526.csv").exists() and (candidate / "pcf55_teams_extracted.json").exists():
+            return candidate
+    return candidates[0]
+
+
+ASSETS_DIR = _resolve_assets_dir()
 PLAYERS_CSV  = ASSETS_DIR / "pcf55_players_2526.csv"
 TEAMS_JSON   = ASSETS_DIR / "pcf55_teams_extracted.json"
 
