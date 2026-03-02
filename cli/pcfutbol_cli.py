@@ -2287,6 +2287,7 @@ def _append_dynamic_news(
     mgr_name: str,
     standings: list[Standing],
     n_rel: int,
+    data: Optional[dict] = None,
 ) -> list[str]:
     total = len(standings)
     mgr_pos = next((i + 1 for i, s in enumerate(standings) if s.team.slot_id == mgr_slot), 0)
@@ -2294,16 +2295,14 @@ def _append_dynamic_news(
     noise = sum((r["h"] * 31 + r["a"] * 17 + r["hg"] * 7 + r["ag"]) for r in md_res) if md_res else 0
     rng = random.Random(md * 1315423911 ^ mgr_slot ^ noise)
 
+    comp_key = str((data or {}).get("competition", getattr(mgr_team, "comp", "ES1")))
+    ci = COMP_INFO.get(comp_key, {})
+    total_md = int(ci.get("tot_md", 38))
+    window_open = _is_window_open(md, total_md)
+
     candidates: list[str] = []
     if my_r:
         candidates.append(_news_item(my_r, tbs, mgr_slot, mgr_name, mgr_pos, total, n_rel))
-
-    striker = _pick_player_name(mgr_team, rng, prefer_attack=True)
-    candidates.append(f"Tu delantero {striker} ha marcado 2 goles - forma al maximo.")
-
-    injured = _pick_player_name(mgr_team, rng)
-    weeks = rng.randint(2, 4)
-    candidates.append(f"Lesion de {injured} - baja {weeks} semanas.")
 
     if mgr_pos:
         if mgr_pos <= max(3, total // 4):
@@ -2313,12 +2312,36 @@ def _append_dynamic_news(
         else:
             candidates.append(f"La junta mantiene la calma con tu rendimiento (pos {mgr_pos}).")
 
+    if rng.random() < (0.28 if my_r and ((my_r.get("hg", 0) + my_r.get("ag", 0)) >= 3) else 0.16):
+        striker = _pick_player_name(mgr_team, rng, prefer_attack=True)
+        candidates.append(f"{striker} atraviesa un gran momento goleador.")
+
+    if rng.random() < 0.14:
+        injured = _pick_player_name(mgr_team, rng)
+        weeks = rng.randint(1, 4)
+        candidates.append(f"Lesion de {injured} - baja {weeks} semanas.")
+
+    if rng.random() < 0.20:
+        player = _pick_player_name(mgr_team, rng, prefer_attack=True)
+        clause = rng.randint(10, 55)
+        if rng.random() < 0.58:
+            candidates.append(f"Renovacion encaminada de {player}; clausula objetivo {clause}M.")
+        else:
+            candidates.append(f"El agente de {player} exige mejorar la clausula ({clause}M).")
+
+    if rng.random() < 0.12:
+        cantera = f"Cantera {rng.randint(100, 999)}"
+        candidates.append(f"Informe cantera: {cantera} destaca en juveniles esta semana.")
+
     rivals = [t for sid, t in tbs.items() if sid != mgr_slot]
-    if rivals:
+    if rivals and window_open and rng.random() < 0.52:
         rival = rng.choice(rivals)
         fichaje = _pick_player_name(rival, rng, prefer_attack=True)
         fee = rng.randint(1, 8)
         candidates.append(f"Rival {rival.name} acaba de fichar a {fichaje} por {fee}M.")
+    elif rivals and rng.random() < 0.22:
+        rival = rng.choice(rivals)
+        candidates.append(f"Rival {rival.name} acelera renovaciones para blindar su plantilla.")
 
     unique: list[str] = []
     seen: set[str] = set()
@@ -2331,7 +2354,7 @@ def _append_dynamic_news(
     if not unique:
         return []
     rng.shuffle(unique)
-    take = 2 if len(unique) > 1 and rng.random() < 0.65 else 1
+    take = 2 if len(unique) > 1 and rng.random() < 0.55 else 1
     selected = unique[:take]
     for item in selected:
         news.append(f"J{md}: {item}")
@@ -3025,6 +3048,30 @@ def _ball_drift(zone: int, rng: random.Random, our_str: float, opp_str: float) -
     return zone
 
 
+def _coach_input(prompt: str, default: str = "") -> str:
+    try:
+        return input(prompt).strip()
+    except (EOFError, KeyboardInterrupt):
+        return default
+
+
+def _coach_input_int(prompt: str, min_val: int, max_val: int, default: int = 0) -> int:
+    default = max(min_val, min(max_val, default))
+    while True:
+        raw = _coach_input(prompt, str(default))
+        if raw == "":
+            value = default
+        else:
+            try:
+                value = int(raw)
+            except ValueError:
+                print(f"  Introduce un numero entre {min_val} y {max_val}.")
+                continue
+        if min_val <= value <= max_val:
+            return value
+        print(f"  Introduce un numero entre {min_val} y {max_val}.")
+
+
 def _entrenador_substitution(mgr_team: "Team", subs_made: list) -> bool:
     """Cosmetic substitution during entrenador mode."""
     squad = sorted(mgr_team.players, key=lambda p: p.overall, reverse=True)
@@ -3038,10 +3085,10 @@ def _entrenador_substitution(mgr_team: "Team", subs_made: list) -> bool:
         tag = _c(RED, " sale") if p.name in subs_made else ""
         print(f"  {i:>3}  {p.name[:25]:<26} {p.position[:17]:<18} {p.me:>3}{tag}")
     print()
-    out_i = input_int(f"  Sale  (1-{len(squad)}, 0=cancelar): ", 0, len(squad))
+    out_i = _coach_input_int(f"  Sale  (1-{len(squad)}, 0=cancelar): ", 0, len(squad), default=0)
     if out_i == 0:
         return False
-    in_i = input_int(f"  Entra (1-{len(squad)}, 0=cancelar): ", 0, len(squad))
+    in_i = _coach_input_int(f"  Entra (1-{len(squad)}, 0=cancelar): ", 0, len(squad), default=0)
     if in_i == 0 or in_i == out_i:
         return False
     subs_made.append(squad[out_i - 1].name)
@@ -3115,6 +3162,7 @@ def _match_entrenador(
         event_boost = 1.50
         narration_every_minutes = max(1, int(round(10.0 / max(TICK, 0.01))))
         micro_event_base = 0.14
+    is_human_mode = speed_mode != "FAST"
     last_narration_minute = [0]
 
     def _wait(seconds: float):
@@ -3216,7 +3264,7 @@ def _match_entrenador(
             momentum[0] += 0.06
             if subs[0] == 0:
                 break
-            nx = input(_c(CYAN, f"  Otro cambio? ({subs[0]} restantes) [S=Si / Intro=No]: ")).strip().upper()
+            nx = _coach_input(_c(CYAN, f"  Otro cambio? ({subs[0]} restantes) [S=Si / Intro=No]: ")).upper()
             if nx != "S":
                 break
         wins[0] -= 1
@@ -3232,7 +3280,7 @@ def _match_entrenador(
         print(_c(CYAN, "  C. Calmar partido (8')"))
         print(_c(CYAN, "  T. Cambiar tactica completa"))
         print(_c(CYAN, "  0. Continuar"))
-        ch = input("  > ").strip().upper()
+        ch = _coach_input("  > ").upper()
 
         half_idx = current_half_idx()
         if ch == "W" and wins[0] > 0 and subs[0] > 0:
@@ -3332,7 +3380,7 @@ def _match_entrenador(
 
     def maybe_injury(minute):
         half_idx = current_half_idx()
-        p_injury = (0.0025 + (0.0015 if press_boost[0] > 0 else 0.0)) * (1.20 if speed_mode == "HUMAN" else 1.0)
+        p_injury = (0.0025 + (0.0015 if press_boost[0] > 0 else 0.0)) * (1.20 if is_human_mode else 1.0)
         if rng.random() >= p_injury:
             return
 
@@ -3354,21 +3402,21 @@ def _match_entrenador(
     def maybe_time_wasting(minute):
         manager_waste_on = int(tactic_ref[0].get("perdidaTiempo", 0)) == 1
         if manager_waste_on and manager_leading():
-            p_manager = 0.045 if speed_mode == "HUMAN" else 0.020
+            p_manager = 0.045 if is_human_mode else 0.020
             if minute < 60:
                 p_manager *= 0.60
             if rng.random() < p_manager:
                 draw(minute, _c(CYAN, "Pierdes tiempo: saques lentos y pausas en banda."))
                 momentum[0] += 0.03
-                _wait(0.25 if speed_mode == "HUMAN" else 0.10)
+                _wait(0.25 if is_human_mode else 0.10)
                 return
 
         if manager_score() < rival_score() and minute >= 70:
-            p_rival = 0.040 if speed_mode == "HUMAN" else 0.018
+            p_rival = 0.040 if is_human_mode else 0.018
             if rng.random() < p_rival:
                 draw(minute, _c(GRAY, "El rival retrasa la reanudacion y enfria el partido."))
                 momentum[0] -= 0.04
-                _wait(0.25 if speed_mode == "HUMAN" else 0.10)
+                _wait(0.25 if is_human_mode else 0.10)
 
     def minute_strengths() -> tuple[float, float, float]:
         our_adj = _tactic_adj(tactic_ref[0], is_home=False)
@@ -3455,11 +3503,11 @@ def _match_entrenador(
                 draw(minute, _c(GRAY, rng.choice(_COMM_ATT_RIVAL)))
             else:
                 draw(minute, _c(GRAY, rng.choice(_COMM_MID)))
-            _wait(0.25 if speed_mode == "HUMAN" else 0.10)
+            _wait(0.25 if is_human_mode else 0.10)
 
     # Kickoff
     draw(1, _c(GRAY, f"[Intro] para comenzar... ({speed_mode})"))
-    input()
+    _coach_input("")
 
     # 1st half
     for minute in range(1, 46):
@@ -3498,7 +3546,7 @@ def _match_entrenador(
         print(_c(CYAN, "  P. Presion alta (8')"))
         print(_c(CYAN, "  C. Calmar partido (8')"))
         print(_c(CYAN, "  0. Empezar 2a parte"))
-        ch = input("  Opcion: ").strip().upper()
+        ch = _coach_input("  Opcion: ").upper()
         if ch in ("", "0"):
             break
         if ch == "T":
@@ -3513,7 +3561,7 @@ def _match_entrenador(
                 subs_h[1] += 1
                 if subs[0] == 0:
                     break
-                nx = input(_c(CYAN, f"  Otro cambio? ({subs[0]} restantes) [S/N]: ")).strip().upper()
+                nx = _coach_input(_c(CYAN, f"  Otro cambio? ({subs[0]} restantes) [S/N]: ")).upper()
                 if nx != "S":
                     break
             continue
@@ -3558,7 +3606,7 @@ def _match_entrenador(
     rc = GREEN if won else (RED if lost else CYAN)
     res = "VICTORIA" if won else ("DERROTA" if lost else "EMPATE")
     draw("FT", _c(rc + BOLD, f"PITIDO FINAL  {res}  {fhg}-{fag}"))
-    input(_c(GRAY, "  [Intro] para continuar..."))
+    _coach_input(_c(GRAY, "  [Intro] para continuar..."))
     return fhg, fag
 
 
@@ -4910,7 +4958,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
             _show_md_results(md_res, tbs, mgr_slot)
             new_st = _standings_from_results(results, tbs)
             new_items = _append_dynamic_news(
-                news, cur_md, md_res, tbs, mgr_slot, mgr_team, mgr_name, new_st, n_rel
+                news, cur_md, md_res, tbs, mgr_slot, mgr_team, mgr_name, new_st, n_rel, data
             )
             my_r = next((r for r in md_res if r["h"] == mgr_slot or r["a"] == mgr_slot), None)
             mgr_pos = next((i + 1 for i, s in enumerate(new_st) if s.team.slot_id == mgr_slot), len(new_st))
@@ -5011,6 +5059,7 @@ def _season_loop(data: dict, liga1: list[Team], liga2: list[Team], liga_rfef: li
                     mgr_name,
                     _standings_from_results(results, tbs),
                     n_rel,
+                    data,
                 )
                 new_st = _standings_from_results(results, tbs)
                 my_r = next((r for r in md_res if r["h"] == mgr_slot or r["a"] == mgr_slot), None)

@@ -24,7 +24,10 @@ OUTPUT_ROOT = CLI_CWD / "qa_outputs"
 CAREER_SAVE = Path.home() / ".pcfutbol_career.json"
 PLAYERS_CSV = ROOT / "android" / "core" / "data" / "src" / "main" / "assets" / "pcf55_players_2526.csv"
 
-SEASONS_TARGET = 5
+try:
+    SEASONS_TARGET = max(1, int(os.getenv("PCF_QA_SEASONS", "5")))
+except ValueError:
+    SEASONS_TARGET = 5
 MANAGER_NAME = "JORNADA_REAL"
 OFFER_ROTATION = [1, 2, 3, 4, 1]
 COACH_MATCHES_PER_SEASON = 2
