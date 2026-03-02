@@ -506,6 +506,16 @@ class CompetitionRepository @Inject constructor(
                 teamId = managerTeamId,
             )
         )
+
+        publishManagerDynamicNews(
+            state = stateAfterUpdates,
+            team = team,
+            squad = squad,
+            managerFixture = managerFixture,
+            managerResult = managerResult,
+            updatedStandings = updatedStandings,
+            matchday = matchday,
+        )
     }
 
     private data class MarketWeeklyUpdate(
@@ -998,5 +1008,140 @@ class CompetitionRepository @Inject constructor(
                 teamId = teamId,
             )
         )
+    }
+
+    private suspend fun publishManagerDynamicNews(
+        state: SeasonStateEntity,
+        team: TeamEntity,
+        squad: List<PlayerEntity>,
+        managerFixture: FixtureEntity,
+        managerResult: MatchResult,
+        updatedStandings: List<StandingEntity>,
+        matchday: Int,
+    ) {
+        if (squad.isEmpty()) return
+
+        val managerIsHome = managerFixture.homeTeamId == team.slotId
+        val rivalTeamId = if (managerIsHome) managerFixture.awayTeamId else managerFixture.homeTeamId
+        val rivalTeamName = teamDao.byId(rivalTeamId)?.nameShort ?: "el rival"
+        val managerGoals = if (managerIsHome) managerResult.homeGoals else managerResult.awayGoals
+        val rivalGoals = if (managerIsHome) managerResult.awayGoals else managerResult.homeGoals
+        val goalDiff = managerGoals - rivalGoals
+
+        val totalTeams = updatedStandings.size.coerceAtLeast(1)
+        val managerPosition = updatedStandings
+            .firstOrNull { it.teamId == team.slotId }
+            ?.position
+            ?.takeIf { it > 0 }
+            ?: totalTeams
+
+        val seed = state.season.hashCode().toLong() xor
+            (matchday.toLong() * 1_315_423_911L) xor
+            (team.slotId.toLong() * 97L) xor
+            ((managerResult.homeGoals + managerResult.awayGoals).toLong() shl 6)
+        val rng = kotlin.random.Random(seed)
+
+        val candidates = mutableListOf<Pair<String, String>>()
+        val venue = if (managerIsHome) "en casa" else "a domicilio"
+        val matchNarrative = when {
+            goalDiff > 0 -> "Victoria $venue ante $rivalTeamName ($managerGoals-$rivalGoals)."
+            goalDiff == 0 -> "Empate $venue ante $rivalTeamName ($managerGoals-$rivalGoals)."
+            else -> "Derrota $venue ante $rivalTeamName ($managerGoals-$rivalGoals)."
+        }
+        candidates += "BOARD" to matchNarrative
+
+        val upperZone = maxOf(3, totalTeams / 4)
+        val relegationLine = maxOf(1, competitionDao.byCode(managerFixture.competitionCode)?.relegationSlots ?: 3)
+        val inRelegation = managerPosition > totalTeams - relegationLine
+        candidates += "BOARD" to when {
+            managerPosition <= upperZone -> "La junta esta satisfecha con tu rendimiento (pos $managerPosition)."
+            inRelegation -> "La junta exige reaccion inmediata (pos $managerPosition)."
+            else -> "La junta mantiene la calma con tu rendimiento (pos $managerPosition)."
+        }
+
+        val totalGoals = managerResult.homeGoals + managerResult.awayGoals
+        val hotPlayerChance = if (totalGoals >= 3) 0.28 else 0.16
+        if (rng.nextDouble() < hotPlayerChance) {
+            val striker = pickPlayerName(squad, rng, preferAttack = true)
+            candidates += "BOARD" to "$striker atraviesa un gran momento goleador."
+        }
+
+        if (rng.nextDouble() < 0.14) {
+            val injured = pickPlayerName(squad, rng, preferAttack = false)
+            val weeks = rng.nextInt(1, 5)
+            candidates += "INJURY" to "Lesion de $injured - baja $weeks semanas."
+        }
+
+        if (rng.nextDouble() < 0.20) {
+            val player = pickPlayerName(squad, rng, preferAttack = true)
+            val clause = rng.nextInt(10, 56)
+            if (rng.nextDouble() < 0.58) {
+                candidates += "BOARD" to "Renovacion encaminada de $player; clausula objetivo ${clause}M."
+            } else {
+                candidates += "BOARD" to "El agente de $player exige mejorar la clausula (${clause}M)."
+            }
+        }
+
+        if (rng.nextDouble() < 0.12) {
+            val cantera = "Cantera ${rng.nextInt(100, 1000)}"
+            candidates += "BOARD" to "Informe cantera: $cantera destaca en juveniles esta semana."
+        }
+
+        val rivalIds = updatedStandings
+            .map { it.teamId }
+            .distinct()
+            .filter { it != team.slotId }
+        if (rivalIds.isNotEmpty()) {
+            val randomRivalId = rivalIds[rng.nextInt(rivalIds.size)]
+            val randomRivalName = teamDao.byId(randomRivalId)?.nameShort ?: "Rival"
+            if (state.transferWindowOpen && rng.nextDouble() < 0.52) {
+                val rivalSquad = playerDao.byTeamNow(randomRivalId)
+                val transferPlayer = pickPlayerName(rivalSquad, rng, preferAttack = true)
+                val fee = rng.nextInt(1, 9)
+                candidates += "TRANSFER" to "Rival $randomRivalName acaba de fichar a $transferPlayer por ${fee}M."
+            } else if (!state.transferWindowOpen && rng.nextDouble() < 0.22) {
+                candidates += "BOARD" to "Rival $randomRivalName acelera renovaciones para blindar su plantilla."
+            }
+        }
+
+        val uniqueCandidates = candidates.distinctBy { it.second }
+        if (uniqueCandidates.isEmpty()) return
+        val selected = uniqueCandidates
+            .shuffled(rng)
+            .take(
+                if (uniqueCandidates.size > 1 && rng.nextDouble() < 0.55) {
+                    2
+                } else {
+                    1
+                }
+            )
+
+        selected.forEach { (category, body) ->
+            newsDao.insert(
+                NewsEntity(
+                    date = java.time.LocalDate.now().toString(),
+                    matchday = matchday,
+                    category = category,
+                    titleEs = "J$matchday: Entorno ProManager",
+                    bodyEs = body,
+                    teamId = team.slotId,
+                )
+            )
+        }
+    }
+
+    private fun pickPlayerName(
+        players: List<PlayerEntity>,
+        rng: kotlin.random.Random,
+        preferAttack: Boolean,
+    ): String {
+        if (players.isEmpty()) return "Jugador"
+        val attackingPool = players.filter { player ->
+            val pos = player.position.uppercase()
+            pos.contains("DC") || pos.contains("EX") || pos.contains("DL") || pos.contains("FW") || pos.contains("ST")
+        }
+        val pool = if (preferAttack && attackingPool.isNotEmpty()) attackingPool else players
+        val selected = pool[rng.nextInt(pool.size)]
+        return selected.nameFull.ifBlank { selected.nameShort }.trim().ifBlank { "Jugador" }
     }
 }
