@@ -3091,26 +3091,30 @@ def _match_entrenador(
     calm_boost = [0]
     momentum = [0.0]          # positive favours manager
 
-    speed_mode_raw = os.getenv("PCF_COACH_SPEED", "human").strip().lower()
+    speed_mode_raw = os.getenv("PCF_COACH_SPEED", "human5").strip().lower()
     if speed_mode_raw in ("fast", "qa", "bot"):
         speed_mode = "FAST"
         TICK = 0.11
         sleep_scale = 0.40
-    else:
-        # Modo humano: experiencia de 5-8 minutos por partido aprox.
-        speed_mode = "HUMAN"
-        TICK = 3.5
-        sleep_scale = 1.0
-
-    if speed_mode == "HUMAN":
-        # Partidos ms cargados de sucesos y narracin frecuente.
-        event_boost = 1.50
-        narration_every_minutes = max(1, int(round(10.0 / max(TICK, 0.01))))
-        micro_event_base = 0.14
-    else:
         event_boost = 1.0
         narration_every_minutes = 0
         micro_event_base = 0.04
+    elif speed_mode_raw in ("human8", "h8", "8m", "8min", "slow"):
+        # Modo humano largo: ~8 minutos reales por partido.
+        speed_mode = "HUMAN8"
+        TICK = 5.2
+        sleep_scale = 1.0
+        event_boost = 1.65
+        narration_every_minutes = max(1, int(round(10.0 / max(TICK, 0.01))))
+        micro_event_base = 0.16
+    else:
+        # Modo humano corto (default): ~5 minutos reales por partido.
+        speed_mode = "HUMAN5"
+        TICK = 3.5
+        sleep_scale = 1.0
+        event_boost = 1.50
+        narration_every_minutes = max(1, int(round(10.0 / max(TICK, 0.01))))
+        micro_event_base = 0.14
     last_narration_minute = [0]
 
     def _wait(seconds: float):
