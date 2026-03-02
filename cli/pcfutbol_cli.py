@@ -1679,7 +1679,19 @@ def _build_players_snapshot(liga1: list[Team], liga2: list[Team], season: str) -
 
 
 def _format_attr_delta(delta: int, attr: str) -> str:
-    label = {"me": "ME", "ve": "VE", "re": "RE", "ca": "CA", "ag": "AG"}.get(attr, attr.upper())
+    label = {
+        "me": "ME",
+        "ve": "VE",
+        "re": "RE",
+        "ca": "CA",
+        "ag": "AG",
+        "remate": "REM",
+        "regate": "REG",
+        "pase": "PAS",
+        "tiro": "TIR",
+        "entrada": "ENT",
+        "portero": "POR",
+    }.get(attr, attr.upper())
     return f"{delta:+d} {label}"
 
 
@@ -1844,6 +1856,12 @@ def _apply_season_development(data: dict) -> dict:
             "re": int(p.get("re", 50)),
             "ca": int(p.get("ca", 50)),
             "ag": int(p.get("ag", 50)),
+            "remate": int(p.get("remate", 0)),
+            "regate": int(p.get("regate", 0)),
+            "pase": int(p.get("pase", 0)),
+            "tiro": int(p.get("tiro", 0)),
+            "entrada": int(p.get("entrada", 0)),
+            "portero": int(p.get("portero", 0)),
         }
 
         will_retire = age >= 37 or (age >= 35 and int(p.get("ve", 50)) <= 30)
@@ -1920,6 +1938,12 @@ def _apply_season_development(data: dict) -> dict:
             "re": int(p.get("re", 50)),
             "ca": int(p.get("ca", 50)),
             "ag": int(p.get("ag", 50)),
+            "remate": int(p.get("remate", 0)),
+            "regate": int(p.get("regate", 0)),
+            "pase": int(p.get("pase", 0)),
+            "tiro": int(p.get("tiro", 0)),
+            "entrada": int(p.get("entrada", 0)),
+            "portero": int(p.get("portero", 0)),
         }
         deltas = {k: after[k] - before[k] for k in before}
         pos_changes = [(k, v) for k, v in deltas.items() if v > 0]

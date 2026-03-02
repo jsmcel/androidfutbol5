@@ -66,7 +66,7 @@ object OfferPoolGenerator {
                 ManagerOffer(
                     team = team,
                     salary = calcSalary(team, manager.prestige),
-                    objectiveLevel = calcObjective(team.competitionKey, team.prestige),
+                    objectiveLevel = calcObjective(team, allTeams),
                 )
             }
     }
@@ -184,7 +184,28 @@ object OfferPoolGenerator {
         return team.prestige * 5 + managerPrestige * 2 + leagueBonus
     }
 
-    private fun calcObjective(compKey: String, teamPrestige: Int): Int = when {
+    private fun calcObjective(team: TeamEntity, allTeams: List<TeamEntity>): Int {
+        val peers = allTeams.filter { it.competitionKey == team.competitionKey }
+        if (peers.isEmpty()) {
+            return fallbackObjective(team.competitionKey, team.prestige)
+        }
+
+        val ranked = peers.sortedWith(
+            compareByDescending<TeamEntity> { it.prestige }
+                .thenBy { it.slotId },
+        )
+        val pos = ranked.indexOfFirst { it.slotId == team.slotId }
+            .takeIf { it >= 0 }
+            ?.plus(1)
+            ?: (ranked.size / 2).coerceAtLeast(1)
+
+        if (pos <= 3) return 3
+        if (team.competitionKey == CompetitionDefinitions.LIGA1 && pos <= 6) return 3
+        if (pos <= 10) return 2
+        return 1
+    }
+
+    private fun fallbackObjective(compKey: String, teamPrestige: Int): Int = when {
         compKey in rfef2Leagues || compKey in rfef1Leagues || compKey == CompetitionDefinitions.LIGA2 -> 1
         teamPrestige <= 3 -> 1
         teamPrestige in 4..6 -> 2

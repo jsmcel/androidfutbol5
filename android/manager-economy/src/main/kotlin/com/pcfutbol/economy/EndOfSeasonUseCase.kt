@@ -124,7 +124,13 @@ class EndOfSeasonUseCase @Inject constructor(
         val managerPos = managerStanding?.position ?: 0
         val managerPts = managerStanding?.points ?: 0
 
-        val objective = managerTeam?.let { BoardObjectives.assignObjective(it) }
+        val competitionTeamIds = managerStandings.map { it.teamId }
+        val competitionTeams = if (competitionTeamIds.isNotEmpty()) {
+            teamDao.byIds(competitionTeamIds)
+        } else {
+            emptyList()
+        }
+        val objective = managerTeam?.let { BoardObjectives.assignObjective(it, competitionTeams) }
         val objectiveStandings = managerStandings.ifEmpty {
             if (managerCompCode == LIGA2) liga2Standings else liga1Standings
         }
