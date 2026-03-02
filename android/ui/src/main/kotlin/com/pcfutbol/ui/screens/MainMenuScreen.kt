@@ -562,6 +562,8 @@ private fun TitleWithGlow() {
 fun MainMenuScreen(
     onLigaManager: () -> Unit,
     onProManager: () -> Unit,
+    onNationalTeam: () -> Unit,
+    onRealFootball: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -581,7 +583,8 @@ fun MainMenuScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -610,7 +613,7 @@ fun MainMenuScreen(
                 fontSize = 12.sp,
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(22.dp))
 
             // Pelota rodante
             RollingBall()
@@ -633,7 +636,25 @@ fun MainMenuScreen(
                 color = DosYellow,
             )
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(12.dp))
+
+            DosButtonAnimated(
+                text = " SELECCION ESPANOLA ",
+                onClick = onNationalTeam,
+                modifier = Modifier.width(260.dp),
+                color = DosCyan,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            DosButtonAnimated(
+                text = "  ACTUALIDAD REAL  ",
+                onClick = onRealFootball,
+                modifier = Modifier.width(260.dp),
+                color = DosGreen,
+            )
+
+            Spacer(Modifier.height(28.dp))
 
             // Footer
             Text(

@@ -47,6 +47,8 @@ fun PcfNavHost() {
             MainMenuScreen(
                 onLigaManager = { navController.navigate(Routes.LIGA_SELECT) },
                 onProManager = { navController.navigate(Routes.PROMANAGER_OFFERS) },
+                onNationalTeam = { navController.navigate(Routes.SELECCION) },
+                onRealFootball = { navController.navigate(Routes.REAL_FOOTBALL) },
             )
         }
 
