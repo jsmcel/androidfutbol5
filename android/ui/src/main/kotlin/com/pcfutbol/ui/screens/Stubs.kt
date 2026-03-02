@@ -86,6 +86,12 @@ fun LigaSelectScreen(
     vm: LigaSelectViewModel = hiltViewModel(),
 ) {
     val ligaState by vm.uiState.collectAsState()
+    var showLeaguePicker by remember(ligaState.managerTeamId) {
+        mutableStateOf(ligaState.managerTeamId <= 0)
+    }
+    LaunchedEffect(ligaState.managerTeamId) {
+        if (ligaState.managerTeamId <= 0) showLeaguePicker = true
+    }
 
     Column(
         modifier = Modifier
@@ -214,6 +220,21 @@ fun LigaSelectScreen(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        StatusPill(
+                            text = "FASE ${ligaState.phase.uppercase()}",
+                            color = DosCyan,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatusPill(
+                            text = if (ligaState.transferWindowOpen) "MERCADO ABIERTO" else "MERCADO CERRADO",
+                            color = if (ligaState.transferWindowOpen) DosGreen else DosGray,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     DosButton(
                         text = "NIVEL CONTROL: ${ligaState.managerControlModeLabel}",
                         onClick = { vm.cycleControlMode() },
@@ -222,12 +243,91 @@ fun LigaSelectScreen(
                     )
                     if (!ligaState.managerDepthEnabled) {
                         Text(
-                            text = "Modo Basico: staff y modo entrenador desactivados.",
+                            text = "Modo Basico: sin staff, sin entrenador y sin presidencia avanzada.",
+                            color = DosGray,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                        )
+                    } else if (!ligaState.presidentDeskEnabled) {
+                        Text(
+                            text = "Despacho del presidente disponible solo en nivel Total.",
                             color = DosGray,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 10.sp,
                         )
                     }
+
+                    DosButton(
+                        text = "CONTINUAR JORNADA ${ligaState.currentMatchday}",
+                        onClick = { onMatchday(ligaState.currentMatchday) },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = DosGreen,
+                    )
+
+                    MenuSectionTitle("PARTIDO Y EQUIPO")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DosButton(
+                            text = "MI PLANTILLA",
+                            onClick = onTeam,
+                            modifier = Modifier.weight(1f),
+                            color = DosCyan,
+                        )
+                        DosButton(
+                            text = if (ligaState.transferWindowOpen) "MERCADO [ABIERTO]" else "MERCADO",
+                            onClick = onMarket,
+                            modifier = Modifier.weight(1f),
+                            color = if (ligaState.transferWindowOpen) DosGreen else DosCyan,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DosButton(
+                            text = "ENTRENAMIENTO + STAFF",
+                            onClick = onManagerDepth,
+                            modifier = Modifier.weight(1f),
+                            color = DosYellow,
+                            enabled = ligaState.managerDepthEnabled,
+                        )
+                        DosButton(
+                            text = "PRESIDENTE",
+                            onClick = onPresidentDesk,
+                            modifier = Modifier.weight(1f),
+                            color = if (ligaState.presidentDeskEnabled) DosGreen else DosGray,
+                            enabled = ligaState.presidentDeskEnabled,
+                        )
+                    }
+
+                    MenuSectionTitle("CLUB Y ENTORNO")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DosButton(
+                            text = "ECONOMIA",
+                            onClick = onEconomy,
+                            modifier = Modifier.weight(1f),
+                            color = DosYellow,
+                        )
+                        DosButton(
+                            text = "NOTICIAS",
+                            onClick = onNews,
+                            modifier = Modifier.weight(1f),
+                            color = DosCyan,
+                        )
+                    }
+                    DosButton(
+                        text = "ACTUALIDAD REAL",
+                        onClick = onRealFootball,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = DosGreen,
+                    )
+
+                    MenuSectionTitle("COMPETICIONES")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -244,94 +344,92 @@ fun LigaSelectScreen(
                             color = DosCyan,
                         )
                     }
-                    DosButton(
-                        text = "ECONOMIA",
-                        onClick = onEconomy,
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        color = DosYellow,
-                    )
-                    DosButton(
-                        text = "JORNADA ${ligaState.currentMatchday} (${ligaState.selectedLeague})",
-                        onClick = { onMatchday(ligaState.currentMatchday) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DosButton(
-                        text = "MI PLANTILLA",
-                        onClick = onTeam,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DosButton(
-                        text = "ENTRENAMIENTO + STAFF",
-                        onClick = onManagerDepth,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = DosYellow,
-                        enabled = ligaState.managerDepthEnabled,
-                    )
-                    DosButton(
-                        text = "DESPACHO DEL PRESIDENTE",
-                        onClick = onPresidentDesk,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = if (ligaState.presidentDeskEnabled) DosGreen else DosGray,
-                        enabled = ligaState.presidentDeskEnabled,
-                    )
-                    if (!ligaState.presidentDeskEnabled) {
-                        Text(
-                            text = "Disponible solo en nivel Total.",
-                            color = DosGray,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DosButton(
+                            text = "COPA DEL REY",
+                            onClick = onCopa,
+                            modifier = Modifier.weight(1f),
+                            color = DosCyan,
+                        )
+                        DosButton(
+                            text = "CHAMPIONS",
+                            onClick = onChampions,
+                            modifier = Modifier.weight(1f),
+                            color = DosYellow,
                         )
                     }
-                    DosButton(
-                        text = "NOTICIAS",
-                        onClick = onNews,
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                    DosButton(
-                        text = "ACTUALIDAD REAL",
-                        onClick = onRealFootball,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = DosCyan,
-                    )
-                    DosButton(
-                        text = if (ligaState.transferWindowOpen) "MERCADO [ABIERTO]" else "MERCADO",
-                        onClick = onMarket,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = if (ligaState.transferWindowOpen) DosGreen else DosYellow,
-                    )
-                    DosButton(
-                        text = "COPA DEL REY",
-                        onClick = onCopa,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = DosCyan,
-                    )
-                    DosButton(
-                        text = "CHAMPIONS",
-                        onClick = onChampions,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = DosYellow,
-                    )
-                    DosButton(
-                        text = "SELECCION ESPANOLA",
-                        onClick = onNationalTeam,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = DosYellow,
-                    )
-
-                    LeagueGroupsSection(
-                        selectedLeague = ligaState.selectedLeague,
-                        groups = ligaState.leagueGroups,
-                        onSelectLeague = vm::selectLeague,
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DosButton(
+                            text = "SELECCION ESPANOLA",
+                            onClick = onNationalTeam,
+                            modifier = Modifier.weight(1f),
+                            color = DosYellow,
+                        )
+                        DosButton(
+                            text = "VOLVER",
+                            onClick = onNavigateUp,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
 
                     DosButton(
-                        text = "VOLVER",
-                        onClick = onNavigateUp,
+                        text = if (showLeaguePicker) "OCULTAR LIGAS" else "CAMBIAR LIGA",
+                        onClick = { showLeaguePicker = !showLeaguePicker },
                         modifier = Modifier.fillMaxWidth(),
+                        color = DosGray,
                     )
+                    if (showLeaguePicker || ligaState.managerTeamId <= 0) {
+                        LeagueGroupsSection(
+                            selectedLeague = ligaState.selectedLeague,
+                            groups = ligaState.leagueGroups,
+                            onSelectLeague = vm::selectLeague,
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MenuSectionTitle(text: String) {
+    Text(
+        text = text,
+        color = DosWhite,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun StatusPill(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .border(1.dp, DosGray, RoundedCornerShape(2.dp))
+            .background(DosBlack.copy(alpha = 0.75f))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = color,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            fontSize = 9.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
