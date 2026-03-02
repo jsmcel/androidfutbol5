@@ -21,7 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -121,8 +122,39 @@ fun CoachMatchdayScreen(
         it.homeTeamId == state.managerTeamId || it.awayTeamId == state.managerTeamId
     } ?: false
     val pending = state.fixtures.any { !it.played }
+    val orderedFixtures = remember(state.fixtures, state.managerTeamId) {
+        state.fixtures.sortedWith(
+            compareByDescending<FixtureEntity> {
+                it.homeTeamId == state.managerTeamId || it.awayTeamId == state.managerTeamId
+            }.thenBy { it.id }
+        )
+    }
+    val narrationListState = rememberLazyListState()
     val selectedEvents = remember(selectedFixture?.eventsJson) {
         parseFixtureEvents(selectedFixture?.eventsJson.orEmpty())
+    }
+
+    LaunchedEffect(replayEvents.size, selectedFixture?.id) {
+        if (replayEvents.isNotEmpty()) {
+            narrationListState.animateScrollToItem(replayEvents.lastIndex)
+        }
+    }
+
+    val runAutoSimulation: () -> Unit = {
+        if (state.coachCommandsEnabled) {
+            vm.setCoachCommand(command)
+        }
+        val cmd = if (state.coachCommandsEnabled) command else CoachCommand.BALANCED
+        vm.simulateMatchday(matchday, System.currentTimeMillis(), cmd)
+    }
+
+    val startLiveSimulation: () -> Unit = {
+        vm.setCoachCommand(command)
+        vm.startLiveCoachMatchday(
+            matchday = matchday,
+            seed = System.currentTimeMillis(),
+            tickMs = liveSpeed.tickMs,
+        )
     }
 
     LaunchedEffect(selectedFixture?.id, selectedFixture?.eventsJson, replayNonce) {
@@ -224,36 +256,47 @@ fun CoachMatchdayScreen(
                     fontFamily = FontFamily.Monospace,
                 )
             }
-            DosButton(
-                text = when {
-                    state.liveModeRunning -> "EN VIVO..."
-                    pending && managerSelected && state.coachCommandsEnabled -> "JUGAR EN VIVO"
-                    pending -> "SIMULAR"
-                    else -> "REPETIR"
-                },
-                onClick = {
-                    if (pending) {
-                        if (state.coachCommandsEnabled && managerSelected) {
-                            vm.setCoachCommand(command)
-                            vm.startLiveCoachMatchday(
-                                matchday = matchday,
-                                seed = System.currentTimeMillis(),
-                                tickMs = liveSpeed.tickMs,
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (pending) {
+                    when {
+                        state.liveModeRunning -> {
+                            DosButton(
+                                text = "PARAR",
+                                onClick = vm::stopLiveCoachMatch,
+                                enabled = true,
+                                color = DosRed,
                             )
-                        } else {
-                            if (state.coachCommandsEnabled) {
-                                vm.setCoachCommand(command)
-                            }
-                            val cmd = if (state.coachCommandsEnabled) command else CoachCommand.BALANCED
-                            vm.simulateMatchday(matchday, System.currentTimeMillis(), cmd)
                         }
-                    } else {
-                        replayNonce += 1
+                        managerSelected && state.coachCommandsEnabled -> {
+                            DosButton(
+                                text = "JUGAR EN VIVO",
+                                onClick = startLiveSimulation,
+                                enabled = !state.loading && selectedFixture != null,
+                                color = DosGreen,
+                            )
+                        }
                     }
-                },
-                enabled = !state.loading && selectedFixture != null && !state.liveModeRunning,
-                color = if (pending) DosGreen else DosCyan,
-            )
+                    DosButton(
+                        text = "SIMULAR",
+                        onClick = runAutoSimulation,
+                        enabled = !state.loading && selectedFixture != null && !state.liveModeRunning,
+                        color = DosCyan,
+                    )
+                } else {
+                    DosButton(
+                        text = "REPLAY",
+                        onClick = { replayNonce += 1 },
+                        enabled = selectedFixture?.played == true && !state.liveModeRunning,
+                        color = DosCyan,
+                    )
+                    DosButton(
+                        text = "RESULTADO",
+                        onClick = { selectedFixture?.let { onMatchResult(it.id) } },
+                        enabled = selectedFixture?.played == true,
+                        color = DosYellow,
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -301,7 +344,7 @@ fun CoachMatchdayScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    state.fixtures.forEach { fixture ->
+                    orderedFixtures.forEach { fixture ->
                         val selected = fixture.id == selectedFixtureId
                         val managerMatch = fixture.homeTeamId == managerTeam || fixture.awayTeamId == managerTeam
                         FixtureRow(
@@ -332,6 +375,28 @@ fun CoachMatchdayScreen(
 
                     Spacer(Modifier.height(8.dp))
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        DosButton(
+                            text = if (fixture.played) "ABRIR RESULTADO" else "PARTIDO PENDIENTE",
+                            onClick = { if (fixture.played) onMatchResult(fixture.id) },
+                            modifier = Modifier.weight(1f),
+                            enabled = fixture.played,
+                            color = DosYellow,
+                        )
+                        DosButton(
+                            text = "REPLAY EVENTOS",
+                            onClick = { replayNonce += 1 },
+                            modifier = Modifier.weight(1f),
+                            enabled = fixture.played && !state.liveModeRunning,
+                            color = DosCyan,
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -347,9 +412,49 @@ fun CoachMatchdayScreen(
                         title = "NARRACION",
                         modifier = Modifier.weight(1f),
                     ) {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            items(replayEvents) { event ->
-                                EventLine(event = event, isHome = event.teamId == fixture.homeTeamId)
+                        val goals = replayEvents.count { it.type == "GOAL" || it.type == "OWN_GOAL" }
+                        val cards = replayEvents.count { it.type == "YELLOW_CARD" || it.type == "RED_CARD" }
+                        val varChecks = replayEvents.count { it.type.startsWith("VAR") }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = "EVENTOS ${replayEvents.size}",
+                                color = DosLightGray,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                            )
+                            Text(
+                                text = "GOLES $goals",
+                                color = DosYellow,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                            )
+                            Text(
+                                text = "TARJETAS $cards",
+                                color = DosCyan,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                            )
+                            Text(
+                                text = "VAR $varChecks",
+                                color = DosGreen,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        LazyColumn(
+                            state = narrationListState,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            itemsIndexed(replayEvents) { index, event ->
+                                EventLine(
+                                    event = event,
+                                    isHome = event.teamId == fixture.homeTeamId,
+                                    isLatest = index == replayEvents.lastIndex,
+                                )
                             }
                         }
                     }
@@ -633,7 +738,11 @@ private fun CoachPitch(ballPosition: CoachBallPosition) {
 }
 
 @Composable
-private fun EventLine(event: CoachEventUi, isHome: Boolean) {
+private fun EventLine(
+    event: CoachEventUi,
+    isHome: Boolean,
+    isLatest: Boolean,
+) {
     val typeColor = when (event.type) {
         "GOAL" -> DosYellow
         "OWN_GOAL" -> DosYellow
@@ -649,13 +758,16 @@ private fun EventLine(event: CoachEventUi, isHome: Boolean) {
         else -> DosLightGray
     }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (isLatest) DosNavy.copy(alpha = 0.42f) else Color.Transparent)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top,
     ) {
         Text(
             text = "min ${event.minute.toString().padStart(2, '0')}",
-            color = DosGray,
+            color = if (isLatest) DosCyan else DosGray,
             fontFamily = FontFamily.Monospace,
             fontSize = 10.sp,
             modifier = Modifier.width(54.dp),
@@ -668,6 +780,14 @@ private fun EventLine(event: CoachEventUi, isHome: Boolean) {
             modifier = Modifier.width(14.dp),
         )
         Text(
+            text = eventTypeTag(event.type),
+            color = typeColor,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            modifier = Modifier.width(56.dp),
+        )
+        Text(
             text = event.description,
             color = typeColor,
             fontFamily = FontFamily.Monospace,
@@ -675,6 +795,20 @@ private fun EventLine(event: CoachEventUi, isHome: Boolean) {
             modifier = Modifier.weight(1f),
         )
     }
+}
+
+private fun eventTypeTag(type: String): String = when (type) {
+    "GOAL", "OWN_GOAL" -> "[GOL]"
+    "VAR_REVIEW" -> "[VAR]"
+    "VAR_DISALLOWED" -> "[ANULADO]"
+    "RED_CARD" -> "[ROJA]"
+    "YELLOW_CARD" -> "[AMARILLA]"
+    "INJURY" -> "[LESION]"
+    "SUBSTITUTION" -> "[CAMBIO]"
+    "TACTICAL_STOP" -> "[TACTICO]"
+    "TIME_WASTING" -> "[TIEMPO]"
+    "NARRATION" -> "[NARRA]"
+    else -> "[EVENTO]"
 }
 
 private data class CoachEventUi(
