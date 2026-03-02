@@ -13,7 +13,7 @@ object OfferPoolGenerator {
     data class ManagerOffer(
         val team: TeamEntity,
         val salary: Int,
-        val objectiveLevel: Int, // 1=salvarse, 2=top-10, 3=titulo
+        val objectiveLevel: Int, // 1=salvarse, 2=top-half, 3=top-10, 4=europa, 5=titulo
     )
 
     private val eliteLeagues = setOf("PRML", "BUN1", "SERIA", "LIG1", CompetitionDefinitions.LIGA1, "SPL")
@@ -51,16 +51,28 @@ object OfferPoolGenerator {
                 .thenByDescending { it.prestige }
         )
 
-        val minimumStrictOffers = if (isNewSeason) 3 else 3
+        val minimumStrictOffers = if (isNewSeason) 4 else 3
         val candidates = if (ranked.size >= minimumStrictOffers) {
-            ranked.take(5)
+            ranked.take(if (isNewSeason) 6 else 5)
         } else {
             (ranked + relaxedCandidates(manager, allTeams, teamsWithManager, rookieRfef2Group))
                 .distinctBy { it.slotId }
-                .take(5)
+                .take(if (isNewSeason) 6 else 5)
         }
 
-        return candidates
+        val withStretchOffer = if (isNewSeason) {
+            val stretch = ranked
+                .drop(if (isNewSeason) 6 else 5)
+                .firstOrNull {
+                    it.prestige >= manager.prestige + 1 &&
+                        leagueTier(it.competitionKey) <= 2
+                }
+            if (stretch != null) candidates + stretch else candidates
+        } else {
+            candidates
+        }
+
+        return withStretchOffer
             .distinctBy { it.slotId }
             .map { team ->
                 ManagerOffer(
@@ -199,17 +211,20 @@ object OfferPoolGenerator {
             ?.plus(1)
             ?: (ranked.size / 2).coerceAtLeast(1)
 
-        if (pos <= 3) return 3
-        if (team.competitionKey == CompetitionDefinitions.LIGA1 && pos <= 6) return 3
-        if (pos <= 10) return 2
+        if (pos <= 3) return 5
+        if (team.competitionKey == CompetitionDefinitions.LIGA1 && pos <= 6) return 4
+        if (pos <= 10) return 3
+        if (pos <= (ranked.size / 2).coerceAtLeast(1)) return 2
         return 1
     }
 
     private fun fallbackObjective(compKey: String, teamPrestige: Int): Int = when {
         compKey in rfef2Leagues || compKey in rfef1Leagues || compKey == CompetitionDefinitions.LIGA2 -> 1
         teamPrestige <= 3 -> 1
-        teamPrestige in 4..6 -> 2
-        else -> 3
+        teamPrestige in 4..5 -> 2
+        teamPrestige in 6..7 -> 3
+        teamPrestige in 8..9 -> 4
+        else -> 5
     }
 
     private fun preferredRookieRfef2Group(manager: ManagerProfileEntity): String? {

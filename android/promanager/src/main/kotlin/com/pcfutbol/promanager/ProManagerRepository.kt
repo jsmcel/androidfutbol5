@@ -51,6 +51,7 @@ class ProManagerRepository @Inject constructor(
             manager = manager,
             allTeams = allTeams,
             teamsWithManager = occupiedTeams,
+            isNewSeason = manager.totalSeasons > 0,
         )
     }
 
@@ -78,13 +79,18 @@ class ProManagerRepository @Inject constructor(
         val competition = team?.competitionKey ?: "?"
         val teamName = team?.nameShort ?: "Equipo $teamId"
 
-        val newPrestige = if (objectivesMet)
-            (manager.prestige + 1).coerceAtMost(10)
-        else
-            (manager.prestige - 1).coerceAtLeast(1)
+        val historyArray = runCatching { JSONArray(manager.careerHistoryJson) }.getOrElse { JSONArray() }
         val champion = finalPosition == 1
         val promoted = isPromotion(competition, finalPosition)
         val relegated = isRelegation(competition, finalPosition)
+        val prestigeDelta = calculatePrestigeDelta(
+            objectiveMet = objectivesMet,
+            champion = champion,
+            promoted = promoted,
+            relegated = relegated,
+            history = historyArray,
+        )
+        val newPrestige = (manager.prestige + prestigeDelta).coerceIn(1, 10)
         val historyEntry = JSONObject()
             .put("season", season)
             .put("teamId", teamId)
@@ -93,6 +99,10 @@ class ProManagerRepository @Inject constructor(
             .put("tier", CompetitionDefinitions.competitionTier(competition))
             .put("position", finalPosition)
             .put("objectiveMet", objectivesMet)
+            .put("champion", champion)
+            .put("promoted", promoted)
+            .put("relegated", relegated)
+            .put("prestigeDelta", prestigeDelta)
             .put("prestigeAfter", newPrestige)
         val historyJson = appendHistoryEntry(manager.careerHistoryJson, historyEntry)
 
@@ -122,6 +132,39 @@ class ProManagerRepository @Inject constructor(
             array.remove(0)
         }
         return array.toString()
+    }
+
+    private fun calculatePrestigeDelta(
+        objectiveMet: Boolean,
+        champion: Boolean,
+        promoted: Boolean,
+        relegated: Boolean,
+        history: JSONArray,
+    ): Int {
+        var delta = if (objectiveMet) 1 else -1
+        if (champion) delta += 1
+        if (promoted) delta += 1
+        if (relegated) delta -= 1
+
+        val previousStreak = consecutiveOutcome(history, objectiveMet)
+        if (objectiveMet && previousStreak >= 2) delta += 1
+        if (!objectiveMet && previousStreak >= 2) delta -= 1
+
+        return delta.coerceIn(-3, 3)
+    }
+
+    private fun consecutiveOutcome(history: JSONArray, objectiveMet: Boolean): Int {
+        var streak = 0
+        for (idx in history.length() - 1 downTo 0) {
+            val entry = history.optJSONObject(idx) ?: break
+            val outcome = entry.optBoolean("objectiveMet", false)
+            if (outcome == objectiveMet) {
+                streak += 1
+            } else {
+                break
+            }
+        }
+        return streak
     }
 
     private fun isPromotion(competition: String, finalPosition: Int): Boolean = when (competition) {

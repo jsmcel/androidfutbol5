@@ -113,7 +113,7 @@ class ProManagerViewModel @Inject constructor(
             if (profile != null) {
                 loadOffers(profile.id, profile.name)
             } else {
-                _uiState.value = _uiState.value.copy(error = "Contraseña incorrecta")
+                _uiState.value = _uiState.value.copy(error = "Contrasena incorrecta")
             }
         }
     }
@@ -169,8 +169,10 @@ class ProManagerViewModel @Inject constructor(
         salaryK        = salary,
         objectiveLabel = when (objectiveLevel) {
             1 -> "Salvarse"
-            2 -> "Top 10"
-            3 -> "Título"
+            2 -> "Top mitad"
+            3 -> "Top 10"
+            4 -> "Europa/Champions"
+            5 -> "Titulo"
             else -> "Competir"
         },
     )
@@ -187,7 +189,11 @@ class ProManagerViewModel @Inject constructor(
                     val comp = obj.optString("competition", "?")
                     val pos = obj.optInt("position", 0)
                     val ok = obj.optBoolean("objectiveMet", false)
-                    add("$season | $team ($comp) | Pos $pos | ${if (ok) "Objetivo OK" else "Objetivo NO"}")
+                    val prestigeAfter = obj.optInt("prestigeAfter", 0)
+                    add(
+                        "$season | $team ($comp) | Pos $pos | " +
+                            "${if (ok) "Objetivo OK" else "Objetivo NO"} | Prestigio $prestigeAfter"
+                    )
                 }
             }.asReversed()
         }.getOrDefault(emptyList())

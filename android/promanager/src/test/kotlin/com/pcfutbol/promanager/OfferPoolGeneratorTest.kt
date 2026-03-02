@@ -2,6 +2,7 @@ package com.pcfutbol.promanager
 
 import com.pcfutbol.core.data.db.ManagerProfileEntity
 import com.pcfutbol.core.data.db.TeamEntity
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -162,6 +163,57 @@ class OfferPoolGeneratorTest {
         assertTrue(
             veteranOffers.any { it.team.competitionKey in setOf("PRML", "BUN1", "SPL") },
             "Veterano deberia recibir ofertas de ligas elite"
+        )
+    }
+
+    @Test
+    fun `objetivo de oferta usa ranking relativo en la liga`() {
+        val manager = makeManager(prestige = 8)
+        val teams = listOf(
+            makeTeam(1, prestige = 10, comp = "LIGA1"),
+            makeTeam(2, prestige = 9, comp = "LIGA1"),
+            makeTeam(3, prestige = 8, comp = "LIGA1"),
+            makeTeam(4, prestige = 7, comp = "LIGA1"),
+            makeTeam(5, prestige = 6, comp = "LIGA1"),
+        )
+
+        val offers = OfferPoolGenerator.generate(
+            manager = manager,
+            allTeams = teams,
+            teamsWithManager = emptySet(),
+            isNewSeason = true,
+        )
+        val byTeam = offers.associateBy { it.team.slotId }
+
+        assertEquals(5, byTeam[1]?.objectiveLevel)
+        assertEquals(5, byTeam[2]?.objectiveLevel)
+        assertEquals(4, byTeam[4]?.objectiveLevel)
+        assertEquals(4, byTeam[5]?.objectiveLevel)
+    }
+
+    @Test
+    fun `nueva temporada amplía el abanico de ofertas`() {
+        val manager = makeManager(prestige = 8)
+        val teams = (1..30).map { idx ->
+            makeTeam(slotId = idx, prestige = (idx % 10) + 1, comp = "LIGA1")
+        }
+
+        val normal = OfferPoolGenerator.generate(
+            manager = manager,
+            allTeams = teams,
+            teamsWithManager = emptySet(),
+            isNewSeason = false,
+        )
+        val newSeason = OfferPoolGenerator.generate(
+            manager = manager,
+            allTeams = teams,
+            teamsWithManager = emptySet(),
+            isNewSeason = true,
+        )
+
+        assertTrue(
+            newSeason.size > normal.size,
+            "En nueva temporada deberia haber mas opciones (${newSeason.size} > ${normal.size})"
         )
     }
 }
