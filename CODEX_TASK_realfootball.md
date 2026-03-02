@@ -1,12 +1,12 @@
-# CODEX TASK — Módulo "Actualidad Futbolística" (todas las ligas del juego)
+# CODEX TASK â€” MÃ³dulo "Actualidad FutbolÃ­stica" (todas las ligas del juego)
 
 ## Objetivo
 
-Añadir una sección independiente al juego que muestre datos reales:
-- Clasificación real de cualquier liga del juego
-- Últimos resultados de esa liga
+AÃ±adir una secciÃ³n independiente al juego que muestre datos reales:
+- ClasificaciÃ³n real de cualquier liga del juego
+- Ãšltimos resultados de esa liga
 
-Es una sección separada del modo juego — no toca Season State ni DB.
+Es una secciÃ³n separada del modo juego â€” no toca Season State ni DB.
 
 ## API: TheSportsDB (SIN API KEY, 100% gratuita)
 
@@ -14,20 +14,20 @@ Base URL: `https://www.thesportsdb.com/api/v1/json/3/`
 
 ### Endpoints
 
-**Clasificación:**
+**ClasificaciÃ³n:**
 `GET https://www.thesportsdb.com/api/v1/json/3/lookuptable.php?l={leagueId}&s=2024-2025`
 
-**Últimos resultados:**
+**Ãšltimos resultados:**
 `GET https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id={leagueId}`
 
 ---
 
-## Mapa de ligas del juego → TheSportsDB ID
+## Mapa de ligas del juego â†’ TheSportsDB ID
 
 ```kotlin
 // En RealFootballViewModel.kt
 val LEAGUE_MAP = mapOf(
-    // España
+    // EspaÃ±a
     "LIGA1"   to Pair("Spanish La Liga",           4335),
     "LIGA2"   to Pair("Spanish La Liga 2",         4400),
     "LIGA2B"  to Pair("Primera RFEF Grupo 1",      5086),
@@ -46,9 +46,9 @@ val LEAGUE_MAP = mapOf(
     "DSL"     to Pair("Danish Superliga",          4340),
     "EKSTR"   to Pair("Polish Ekstraklasa",        4422),
     "ABUND"   to Pair("Austrian Bundesliga",       4621),
-    // América
+    // AmÃ©rica
     "ARGPD"   to Pair("Argentine Primera Division",4406),
-    "BRASEA"  to Pair("Brazilian Série A",         4351),
+    "BRASEA"  to Pair("Brazilian SÃ©rie A",         4351),
     "LIGAMX"  to Pair("Mexican Liga MX",           4350),
     // Asia
     "SPL"     to Pair("Saudi Pro League",          4668),
@@ -57,7 +57,7 @@ val LEAGUE_MAP = mapOf(
 
 ---
 
-## Qué implementar
+## QuÃ© implementar
 
 ### Android
 
@@ -69,12 +69,12 @@ fun RealFootballScreen(onNavigateUp: () -> Unit, vm: RealFootballViewModel = hil
 ```
 
 La pantalla tiene:
-1. **Selector de liga** — lista scrollable con todos los nombres del LEAGUE_MAP, estilo DOS (border + background resaltado al seleccionar)
+1. **Selector de liga** â€” lista scrollable con todos los nombres del LEAGUE_MAP, estilo DOS (border + background resaltado al seleccionar)
 2. **Dos tabs** debajo del selector: "CLASIFICACION" y "RESULTADOS"
 3. **Tab CLASIFICACION**: tabla con columnas `Pos Equipo PJ G E P GF GC Pts`
-4. **Tab RESULTADOS**: lista de últimos partidos con fecha, local, marcador, visitante
+4. **Tab RESULTADOS**: lista de Ãºltimos partidos con fecha, local, marcador, visitante
 5. Mientras carga: `Text("Cargando...", color = DosGray)`
-6. Si error: `Text("Sin conexión", color = DosRed)` — nunca crash
+6. Si error: `Text("Sin conexiÃ³n", color = DosRed)` â€” nunca crash
 
 Estilo: igual que el resto (DosBlack, DosCyan, DosYellow, DosWhite, FontFamily.Monospace).
 
@@ -115,10 +115,10 @@ class RealFootballViewModel @Inject constructor() : ViewModel()
 ```
 
 El ViewModel:
-- `fun selectLeague(code: String)` — actualiza selectedLeagueCode y llama fetchData
-- `fun selectTab(tab: Int)` — cambia activeTab
-- `private fun fetchData()` — lanza viewModelScope.launch(Dispatchers.IO), hace HTTP con `java.net.HttpURLConnection`, parsea con `org.json.JSONObject/JSONArray`
-- NO Retrofit, NO Gson, NO dependencias externas — solo Android SDK
+- `fun selectLeague(code: String)` â€” actualiza selectedLeagueCode y llama fetchData
+- `fun selectTab(tab: Int)` â€” cambia activeTab
+- `private fun fetchData()` â€” lanza viewModelScope.launch(Dispatchers.IO), hace HTTP con `java.net.HttpURLConnection`, parsea con `org.json.JSONObject/JSONArray`
+- NO Retrofit, NO Gson, NO dependencias externas â€” solo Android SDK
 
 **Conectar al NavHost** (`android/ui/src/main/kotlin/com/pcfutbol/ui/PcfNavHost.kt`):
 ```kotlin
@@ -129,9 +129,9 @@ composable(Routes.REAL_FOOTBALL) {
 }
 ```
 
-**Añadir botón** en `LigaSelectScreen` (`android/ui/src/main/kotlin/com/pcfutbol/ui/screens/Stubs.kt`):
+**AÃ±adir botÃ³n** en `LigaSelectScreen` (`android/ui/src/main/kotlin/com/pcfutbol/ui/screens/Stubs.kt`):
 
-Añadir `onRealFootball: () -> Unit = {}` como parámetro de `LigaSelectScreen` y un botón:
+AÃ±adir `onRealFootball: () -> Unit = {}` como parÃ¡metro de `LigaSelectScreen` y un botÃ³n:
 ```kotlin
 DosButton(
     text = "ACTUALIDAD REAL",
@@ -144,7 +144,7 @@ DosButton(
 En `PcfNavHost.kt`, pasar `onRealFootball = { navController.navigate(Routes.REAL_FOOTBALL) }` a `LigaSelectScreen`.
 
 **Permiso** en `android/app/src/main/AndroidManifest.xml`:
-Añadir antes de `<application>`:
+AÃ±adir antes de `<application>`:
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 ```
@@ -153,10 +153,10 @@ Añadir antes de `<application>`:
 
 ### CLI
 
-**Añadir en `cli/pcfutbol_cli.py`** (y también en `android/cli/pcfutbol_cli.py`):
+**AÃ±adir en `cli/pcfutbol_cli.py`**:
 
 ```python
-# Mapa completo de ligas → TheSportsDB ID
+# Mapa completo de ligas â†’ TheSportsDB ID
 REAL_LEAGUES = [
     ("Spanish La Liga",            4335, "LIGA1"),
     ("Spanish La Liga 2",          4400, "LIGA2"),
@@ -174,13 +174,13 @@ REAL_LEAGUES = [
     ("Polish Ekstraklasa",         4422, "EKSTR"),
     ("Austrian Bundesliga",        4621, "ABUND"),
     ("Argentine Primera Division", 4406, "ARGPD"),
-    ("Brazilian Série A",          4351, "BRASEA"),
+    ("Brazilian SÃ©rie A",          4351, "BRASEA"),
     ("Mexican Liga MX",            4350, "LIGAMX"),
     ("Saudi Pro League",           4668, "SPL"),
 ]
 
 def menu_real_football() -> None:
-    """Muestra clasificación y resultados reales de cualquier liga via TheSportsDB."""
+    """Muestra clasificaciÃ³n y resultados reales de cualquier liga via TheSportsDB."""
     import urllib.request, json
 
     BASE = "https://www.thesportsdb.com/api/v1/json/3"
@@ -197,9 +197,9 @@ def menu_real_football() -> None:
 
         name, league_id, _ = REAL_LEAGUES[op - 1]
         print(_c(YELLOW, f"\n  {name}"))
-        print("  1. Clasificación")
-        print("  2. Últimos resultados")
-        sub = input_int("  Opción: ", 1, 2)
+        print("  1. ClasificaciÃ³n")
+        print("  2. Ãšltimos resultados")
+        sub = input_int("  OpciÃ³n: ", 1, 2)
 
         try:
             if sub == 1:
@@ -235,14 +235,14 @@ def menu_real_football() -> None:
                         date = ev.get("dateEvent","")
                         print(f"  {date}  {home:>22} {hs}-{aws}  {away}")
         except Exception as e:
-            print(_c(RED, f"  Error de conexión: {e}"))
+            print(_c(RED, f"  Error de conexiÃ³n: {e}"))
 
         _pause()
 ```
 
-Añadir al menú principal opción 8:
+AÃ±adir al menÃº principal opciÃ³n 8:
 ```python
-print("  8. Actualidad futbolística (datos reales)")
+print("  8. Actualidad futbolÃ­stica (datos reales)")
 ```
 Handler:
 ```python
@@ -255,14 +255,16 @@ Y actualizar el rango del input principal de 0-7 a 0-8.
 
 ## Restricciones
 
-- NO dependencias externas en build.gradle.kts — solo `java.net.HttpURLConnection` + `org.json`
-- Si la API devuelve null/vacío para alguna liga, mostrar "Sin datos disponibles" — no crashear
-- El módulo NO modifica nada del estado del juego
-- Aplicar los cambios tanto en `cli/pcfutbol_cli.py` como en `android/cli/pcfutbol_cli.py`
+- NO dependencias externas en build.gradle.kts â€” solo `java.net.HttpURLConnection` + `org.json`
+- Si la API devuelve null/vacÃ­o para alguna liga, mostrar "Sin datos disponibles" â€” no crashear
+- El mÃ³dulo NO modifica nada del estado del juego
+- Aplicar los cambios en `cli/pcfutbol_cli.py`
 
-## Verificación final
+## VerificaciÃ³n final
 
 ```bash
 cd android
 ./gradlew :ui:compileDebugKotlin --no-daemon 2>&1 | tail -5
 ```
+
+

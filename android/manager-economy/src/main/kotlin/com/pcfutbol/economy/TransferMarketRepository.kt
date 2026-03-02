@@ -280,6 +280,80 @@ class TransferMarketRepository @Inject constructor(
         return Result.success("${player.nameShort} vendido a ${buyer.nameShort} por ${askingPriceK}K")
     }
 
+    /**
+     * Acepta una oferta IA concreta (club comprador fijado por la oferta).
+     */
+    suspend fun acceptAiOffer(
+        managerTeamId: Int,
+        offer: TransferOffer,
+    ): Result<String> {
+        val state = seasonStateDao.get() ?: return Result.failure(Exception("Sin temporada activa"))
+        if (!state.transferWindowOpen) {
+            return Result.failure(Exception("Ventana de mercado cerrada"))
+        }
+
+        val player = playerDao.byPid(offer.playerId)
+            ?: return Result.failure(Exception("Jugador no encontrado"))
+        if (player.teamSlotId != managerTeamId) {
+            return Result.failure(Exception("El jugador ya no pertenece a tu equipo"))
+        }
+
+        val sellerTeam = teamDao.byId(managerTeamId)
+            ?: return Result.failure(Exception("Equipo no encontrado"))
+        val buyerTeam = teamDao.byId(offer.toTeamId)
+            ?: return Result.failure(Exception("Club ofertante no encontrado"))
+        if (buyerTeam.slotId == managerTeamId) {
+            return Result.failure(Exception("Oferta invalida: comprador coincide con tu club"))
+        }
+
+        val amountK = offer.amountK.coerceAtLeast(50)
+        if (buyerTeam.budgetK < amountK) {
+            return Result.failure(Exception("${buyerTeam.nameShort} no tiene presupuesto suficiente"))
+        }
+
+        val buyerTerms = projectedContractTerms(
+            player = player,
+            destinationCompetition = buyerTeam.competitionKey,
+            season = state.season,
+        )
+
+        playerDao.update(
+            player.copy(
+                teamSlotId = buyerTeam.slotId,
+                isStarter = false,
+                wageK = buyerTerms.wageK,
+                releaseClauseK = buyerTerms.releaseClauseK,
+                contractEndYear = buyerTerms.contractEndYear,
+            )
+        )
+        teamDao.update(sellerTeam.copy(budgetK = sellerTeam.budgetK + amountK))
+        teamDao.update(buyerTeam.copy(budgetK = buyerTeam.budgetK - amountK))
+
+        val date = java.time.LocalDate.now().toString()
+        newsDao.insert(
+            NewsEntity(
+                date = date,
+                matchday = state.currentMatchday,
+                category = "TRANSFER",
+                titleEs = "VENTA: ${player.nameShort}",
+                bodyEs = "${player.nameFull} deja ${sellerTeam.nameShort} y firma por ${buyerTeam.nameShort} por ${amountK}K.",
+                teamId = managerTeamId,
+            )
+        )
+        newsDao.insert(
+            NewsEntity(
+                date = date,
+                matchday = state.currentMatchday,
+                category = "TRANSFER",
+                titleEs = "FICHAJE: ${player.nameShort}",
+                bodyEs = "${buyerTeam.nameShort} incorpora a ${player.nameFull} por ${amountK}K.",
+                teamId = buyerTeam.slotId,
+            )
+        )
+
+        return Result.success("${player.nameShort} vendido a ${buyerTeam.nameShort} por ${amountK}K")
+    }
+
     suspend fun generateAiOffers(managerTeamId: Int): List<TransferOffer> {
         val state = seasonStateDao.get() ?: return emptyList()
         if (!state.transferWindowOpen) return emptyList()

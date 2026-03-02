@@ -42,6 +42,13 @@ python cli/pcfutbol_cli.py
 El CLI es el "ego" del proyecto: permite a agentes de IA jugar, testear y desarrollar
 la lógica del juego sin necesidad de un dispositivo Android.
 
+QA recomendada (5 temporadas jornada a jornada + guardrail):
+
+```bash
+python cli/qa_play_real_5seasons.py
+python cli/qa_guardrail.py
+```
+
 ## Temporada
 
 **2025/26** — 260 equipos de 19 países, datos reales de Transfermarkt.

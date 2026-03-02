@@ -1,16 +1,17 @@
-﻿# MEJORAS IMPLEMENTADAS
+# MEJORAS IMPLEMENTADAS
+
+> NOTA DE VIGENCIA (2026-03-02): este documento resume cambios de una fase con dos CLIs. El CLI vigente y unico es cli/pcfutbol_cli.py.
 
 Fecha: 2026-02-28
 
 ## Archivos modificados
 - `cli/pcfutbol_cli.py`
-- `android/cli/pcfutbol_cli.py`
 
 ## Mejoras FÁCILES
 1. Menú principal (fix 1)
 - Se corrigió el formato de caja para las opciones 7 y 8.
 - `cli/pcfutbol_cli.py`: se añadió además una opción 7 funcional (mensaje de disponibilidad de multijugador en la variante Android CLI) para evitar opción muda.
-- `android/cli/pcfutbol_cli.py`: opción 8 ahora también queda dentro del recuadro.
+- `cli/pcfutbol_cli.py`: opción 8 ahora también queda dentro del recuadro.
 
 2. Calibración de objetivos (fix 2)
 - `_assign_objective()` ahora usa ranking de fuerza real dentro de su competición.
@@ -75,3 +76,5 @@ Resultado final:
 - `season_completed=True`
 - `exit_code=0`
 - Último log válido: `cli/qa_outputs/20260228_183242_cli_root.stdout.log`
+
+

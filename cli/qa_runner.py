@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -98,16 +100,28 @@ def _looks_like_asset_path_error(text: str) -> bool:
     return "No se encuentra el CSV" in text or "FileNotFoundError" in text
 
 
+def _normalize_text_for_checks(text: str) -> str:
+    """Normaliza para checks robustos ante acentos y mojibake."""
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFD", text)
+    normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+    normalized = normalized.upper()
+    normalized = re.sub(r"[^A-Z0-9]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
 def _season_completed(text: str) -> bool:
+    normalized = _normalize_text_for_checks(text)
     checks = [
         ("MODO PRO MANAGER",),
-        ("SELECCIÓN DE OFERTA", "SELECCIÃ“N DE OFERTA"),
-        ("Simular resto de temporada",),
+        ("SELECCION DE OFERTA", "SELECCIN DE OFERTA", "OFERTA"),
+        ("SIMULAR RESTO DE TEMPORADA", "SIMULANDO JORNADAS"),
         ("FIN DE TEMPORADA",),
-        ("Prestigio:",),
+        ("PRESTIGIO",),
     ]
-    return all(any(option in text for option in variants) for variants in checks)
-
+    return all(any(fragment in normalized for fragment in variants) for variants in checks)
 
 def main() -> int:
     print(f"[qa] save path: {CAREER_SAVE}")
@@ -193,3 +207,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

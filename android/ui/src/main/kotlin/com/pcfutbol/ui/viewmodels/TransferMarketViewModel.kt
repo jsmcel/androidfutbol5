@@ -109,11 +109,7 @@ class TransferMarketViewModel @Inject constructor(
         val managerTeamId = _state.value.managerTeamId
         viewModelScope.launch {
             _state.update { it.copy(loading = true, message = null) }
-            val result = repo.sellPlayer(
-                playerPid = offer.playerId,
-                managerTeamId = managerTeamId,
-                askingPriceK = offer.amountK,
-            )
+            val result = repo.acceptAiOffer(managerTeamId = managerTeamId, offer = offer)
             _state.update { it.copy(loading = false, message = result.getOrElse { e -> e.message }) }
             refreshPools()
         }
