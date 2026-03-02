@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.pcfutbol.core.data.db.PlayerEntity
 import com.pcfutbol.core.data.db.SeasonStateDao
 import com.pcfutbol.core.data.db.TeamDao
+import com.pcfutbol.economy.TransferOffer
 import com.pcfutbol.economy.TransferMarketRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ data class MarketUiState(
     val freeAgents: List<PlayerEntity> = emptyList(),
     val clubPlayers: List<PlayerEntity> = emptyList(),
     val squadPlayers: List<PlayerEntity> = emptyList(),
+    val aiOffers: List<TransferOffer> = emptyList(),
     val teamNamesById: Map<Int, String> = emptyMap(),
     val searchQuery: String = "",
     val filterPosition: String = "ALL",
@@ -103,6 +105,20 @@ class TransferMarketViewModel @Inject constructor(
 
     fun dismissMessage() = _state.update { it.copy(message = null) }
 
+    fun acceptAiOffer(offer: TransferOffer) {
+        val managerTeamId = _state.value.managerTeamId
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, message = null) }
+            val result = repo.sellPlayer(
+                playerPid = offer.playerId,
+                managerTeamId = managerTeamId,
+                askingPriceK = offer.amountK,
+            )
+            _state.update { it.copy(loading = false, message = result.getOrElse { e -> e.message }) }
+            refreshPools()
+        }
+    }
+
     private fun observeSeasonState() {
         viewModelScope.launch {
             seasonStateDao.observe().filterNotNull().collect { ss ->
@@ -128,6 +144,7 @@ class TransferMarketViewModel @Inject constructor(
                     freeAgents = emptyList(),
                     clubPlayers = emptyList(),
                     squadPlayers = emptyList(),
+                    aiOffers = emptyList(),
                     wageBillK = 0,
                     salaryCapK = 0,
                     salaryCapMarginK = 0,
@@ -140,8 +157,15 @@ class TransferMarketViewModel @Inject constructor(
         val freeAgents = repo.freeAgentsNow()
         val clubPlayers = repo.transferTargetsNow(managerTeamId)
         val squad = repo.squadNow(managerTeamId)
+        val aiOffers = repo.generateAiOffers(managerTeamId)
         val capSnapshot = repo.managerSalaryCapSnapshot(managerTeamId)
-        val teamIds = (clubPlayers.mapNotNull { it.teamSlotId } + squad.mapNotNull { it.teamSlotId }).toSet().toList()
+        val teamIds = (
+            clubPlayers.mapNotNull { it.teamSlotId } +
+                squad.mapNotNull { it.teamSlotId } +
+                aiOffers.map { it.toTeamId }
+            )
+            .toSet()
+            .toList()
         val teamNames = if (teamIds.isEmpty()) {
             emptyMap()
         } else {
@@ -153,6 +177,7 @@ class TransferMarketViewModel @Inject constructor(
                 freeAgents = freeAgents,
                 clubPlayers = clubPlayers,
                 squadPlayers = squad,
+                aiOffers = aiOffers,
                 teamNamesById = teamNames,
                 budgetK = budget,
                 wageBillK = capSnapshot.wageBillK,

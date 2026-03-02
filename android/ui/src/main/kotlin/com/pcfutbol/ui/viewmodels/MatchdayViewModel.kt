@@ -14,8 +14,13 @@ import com.pcfutbol.core.data.db.controlModeLabel
 import com.pcfutbol.core.data.db.managerLeague
 import com.pcfutbol.core.data.db.normalizedControlMode
 import com.pcfutbol.core.data.seed.CompetitionDefinitions
+import com.pcfutbol.matchsim.LiveCoachCommand
+import com.pcfutbol.matchsim.LiveCoachMatchSession
+import com.pcfutbol.matchsim.MatchEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +46,13 @@ data class MatchdayUiState(
     val managerControlMode: String = "STANDARD",
     val managerControlModeLabel: String = "Estandar",
     val coachCommandsEnabled: Boolean = true,
+    val liveModeActive: Boolean = false,
+    val liveModeRunning: Boolean = false,
+    val liveFixtureId: Int = -1,
+    val liveMinute: Int = 1,
+    val liveHomeGoals: Int = 0,
+    val liveAwayGoals: Int = 0,
+    val liveEvents: List<MatchEvent> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
     val seasonComplete: Boolean = false,
@@ -57,6 +69,7 @@ class MatchdayViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(MatchdayUiState())
     val uiState: StateFlow<MatchdayUiState> = _uiState.asStateFlow()
+    private var liveJob: Job? = null
 
     /** Resuelve la competicion activa (equipo del manager o liga seleccionada). */
     private suspend fun resolveComp(): String {
@@ -118,6 +131,8 @@ class MatchdayViewModel @Inject constructor(
         seed: Long,
         command: CoachCommand = _uiState.value.coachCommand,
     ): Job {
+        liveJob?.cancel()
+        liveJob = null
         val comp = _uiState.value.competitionCode
         return viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true, error = null)
@@ -148,16 +163,170 @@ class MatchdayViewModel @Inject constructor(
                     managerControlModeLabel = controlModeLabel(controlMode),
                     coachCommandsEnabled = allowsCoachMode(controlMode),
                     coachCommand = if (allowsCoachMode(controlMode)) _uiState.value.coachCommand else CoachCommand.BALANCED,
+                    liveModeActive = false,
+                    liveModeRunning = false,
+                    liveFixtureId = -1,
+                    liveMinute = 1,
+                    liveHomeGoals = 0,
+                    liveAwayGoals = 0,
+                    liveEvents = emptyList(),
                     loading = false,
                     seasonComplete = pending == 0,
                 )
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
+                    liveModeActive = false,
+                    liveModeRunning = false,
+                    liveFixtureId = -1,
+                    liveMinute = 1,
+                    liveHomeGoals = 0,
+                    liveAwayGoals = 0,
+                    liveEvents = emptyList(),
                     loading = false,
                     error = throwable.message ?: "Error simulando jornada",
                 )
             }
         }
+    }
+
+    fun startLiveCoachMatchday(
+        matchday: Int,
+        seed: Long,
+        tickMs: Long = 3_500L,
+    ): Job {
+        liveJob?.cancel()
+        val comp = _uiState.value.competitionCode
+        val job = viewModelScope.launch {
+            runCatching {
+                val seasonState = seasonStateDao.get() ?: error("Sin temporada activa")
+                val managerTeamId = seasonState.managerTeamId
+                if (managerTeamId <= 0) error("No hay equipo manager seleccionado")
+
+                val managerFixture = competitionRepository.fixtures(comp)
+                    .first()
+                    .firstOrNull { fixture ->
+                        fixture.matchday == matchday &&
+                            !fixture.played &&
+                            (fixture.homeTeamId == managerTeamId || fixture.awayTeamId == managerTeamId)
+                    }
+                    ?: error("No hay partido pendiente del manager en esta jornada")
+
+                val context = competitionRepository.buildMatchContextForFixture(managerFixture.id, seed)
+                    ?: error("No se pudo preparar el partido en vivo")
+                val session = LiveCoachMatchSession.create(context, managerTeamId)
+
+                _uiState.value = _uiState.value.copy(
+                    loading = false,
+                    error = null,
+                    liveModeActive = true,
+                    liveModeRunning = true,
+                    liveFixtureId = managerFixture.id,
+                    liveMinute = 1,
+                    liveHomeGoals = 0,
+                    liveAwayGoals = 0,
+                    liveEvents = emptyList(),
+                )
+
+                val clampedTick = tickMs.coerceIn(1_200L, 8_000L)
+                while (true) {
+                    val liveCommand = coachCommandToLive(_uiState.value.coachCommand)
+                    val step = session.step(liveCommand)
+                    val mergedEvents = _uiState.value.liveEvents + step.events
+                    _uiState.value = _uiState.value.copy(
+                        liveModeActive = true,
+                        liveModeRunning = !step.finished,
+                        liveFixtureId = managerFixture.id,
+                        liveMinute = step.minute,
+                        liveHomeGoals = step.homeGoals,
+                        liveAwayGoals = step.awayGoals,
+                        liveEvents = mergedEvents,
+                        loading = false,
+                        error = null,
+                    )
+                    if (step.finished) break
+                    delay(clampedTick)
+                }
+
+                // Persistir el resultado real del partido en vivo y cerrar jornada.
+                applyCoachCommand(_uiState.value.coachCommand)
+                val forcedResult = session.toMatchResult()
+                competitionRepository.advanceMatchday(
+                    competitionCode = comp,
+                    matchday = matchday,
+                    masterSeed = seed,
+                    forcedResults = mapOf(managerFixture.id to forcedResult),
+                )
+
+                val fixtures = competitionRepository.fixtures(comp)
+                    .first()
+                    .filter { it.matchday == matchday }
+                val teamIds = fixtures.flatMap { listOf(it.homeTeamId, it.awayTeamId) }.toSet()
+                val names = teamIds.mapNotNull { id ->
+                    teamDao.byId(id)?.let { id to it.nameShort }
+                }.toMap()
+                val refreshedState = seasonStateDao.get()
+                val controlMode = refreshedState?.normalizedControlMode ?: _uiState.value.managerControlMode
+                val pending = competitionRepository.pendingFixtures(comp)
+
+                _uiState.value = _uiState.value.copy(
+                    fixtures = fixtures,
+                    teamNames = names,
+                    managerTeamId = refreshedState?.managerTeamId ?: managerTeamId,
+                    managerControlMode = controlMode,
+                    managerControlModeLabel = controlModeLabel(controlMode),
+                    coachCommandsEnabled = allowsCoachMode(controlMode),
+                    coachCommand = if (allowsCoachMode(controlMode)) _uiState.value.coachCommand else CoachCommand.BALANCED,
+                    liveModeActive = false,
+                    liveModeRunning = false,
+                    liveFixtureId = -1,
+                    liveMinute = 1,
+                    liveHomeGoals = 0,
+                    liveAwayGoals = 0,
+                    liveEvents = emptyList(),
+                    loading = false,
+                    error = null,
+                    seasonComplete = pending == 0,
+                )
+            }.onFailure { throwable ->
+                if (throwable is CancellationException) return@onFailure
+                _uiState.value = _uiState.value.copy(
+                    loading = false,
+                    liveModeActive = false,
+                    liveModeRunning = false,
+                    liveFixtureId = -1,
+                    liveMinute = 1,
+                    liveHomeGoals = 0,
+                    liveAwayGoals = 0,
+                    liveEvents = emptyList(),
+                    error = throwable.message ?: "Error en partido en vivo",
+                )
+            }
+        }
+        liveJob = job
+        return job
+    }
+
+    fun stopLiveCoachMatch() {
+        liveJob?.cancel()
+        liveJob = null
+        _uiState.value = _uiState.value.copy(
+            liveModeActive = false,
+            liveModeRunning = false,
+            liveFixtureId = -1,
+            liveMinute = 1,
+            liveHomeGoals = 0,
+            liveAwayGoals = 0,
+            liveEvents = emptyList(),
+        )
+    }
+
+    private fun coachCommandToLive(command: CoachCommand): LiveCoachCommand = when (command) {
+        CoachCommand.BALANCED -> LiveCoachCommand.BALANCED
+        CoachCommand.ATTACK_ALL_IN -> LiveCoachCommand.ATTACK_ALL_IN
+        CoachCommand.LOW_BLOCK -> LiveCoachCommand.LOW_BLOCK
+        CoachCommand.HIGH_PRESS -> LiveCoachCommand.HIGH_PRESS
+        CoachCommand.CALM_GAME -> LiveCoachCommand.CALM_GAME
+        CoachCommand.WASTE_TIME -> LiveCoachCommand.WASTE_TIME
     }
 
     private suspend fun applyCoachCommand(command: CoachCommand) {

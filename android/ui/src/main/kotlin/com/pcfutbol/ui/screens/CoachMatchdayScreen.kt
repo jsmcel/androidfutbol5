@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.pcfutbol.core.data.db.FixtureEntity
+import com.pcfutbol.matchsim.MatchEvent
 import com.pcfutbol.ui.components.DosButton
 import com.pcfutbol.ui.components.DosPanel
 import com.pcfutbol.ui.theme.DosBlack
@@ -76,6 +77,11 @@ private const val HUMAN_MATCH_TICK_MS = 3_500L
 private const val HUMAN_MAX_EVENT_GAP_MS = 10_500L
 private const val HUMAN_SAME_MINUTE_EVENT_GAP_MS = 420L
 
+private enum class LiveHumanSpeed(val label: String, val tickMs: Long) {
+    HUMAN_5("5 MIN", 3_500L),
+    HUMAN_8("8 MIN", 5_300L),
+}
+
 @Composable
 fun CoachMatchdayScreen(
     matchday: Int,
@@ -94,6 +100,7 @@ fun CoachMatchdayScreen(
     var selectedFixtureId by remember(matchday) { mutableIntStateOf(-1) }
     var replayNonce by remember { mutableIntStateOf(0) }
     var command by remember { mutableStateOf(CoachCommand.BALANCED) }
+    var liveSpeed by remember { mutableStateOf(LiveHumanSpeed.HUMAN_5) }
 
     LaunchedEffect(matchday) { vm.loadMatchday(matchday) }
     LaunchedEffect(state.seasonComplete) { if (state.seasonComplete) onSeasonComplete() }
@@ -110,6 +117,10 @@ fun CoachMatchdayScreen(
     }
 
     val selectedFixture = state.fixtures.firstOrNull { it.id == selectedFixtureId }
+    val managerSelected = selectedFixture?.let {
+        it.homeTeamId == state.managerTeamId || it.awayTeamId == state.managerTeamId
+    } ?: false
+    val pending = state.fixtures.any { !it.played }
     val selectedEvents = remember(selectedFixture?.eventsJson) {
         parseFixtureEvents(selectedFixture?.eventsJson.orEmpty())
     }
@@ -165,6 +176,28 @@ fun CoachMatchdayScreen(
         replayInProgress = false
     }
 
+    LaunchedEffect(
+        state.liveModeActive,
+        state.liveModeRunning,
+        state.liveFixtureId,
+        state.liveEvents,
+        selectedFixture?.id,
+    ) {
+        val fixture = selectedFixture ?: return@LaunchedEffect
+        if (!state.liveModeActive || state.liveFixtureId != fixture.id) return@LaunchedEffect
+        val mapped = state.liveEvents.map { it.toCoachEventUi() }
+        replayEvents.clear()
+        replayEvents += mapped
+        liveMinute = state.liveMinute
+        liveHomeGoals = state.liveHomeGoals
+        liveAwayGoals = state.liveAwayGoals
+        replayInProgress = state.liveModeRunning
+        val lastEvent = replayEvents.lastOrNull()
+        if (lastEvent != null) {
+            ballPosition = ballPositionForEvent(lastEvent, fixture.homeTeamId)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -177,7 +210,10 @@ fun CoachMatchdayScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onNavigateUp) {
+                IconButton(onClick = {
+                    if (state.liveModeRunning || state.liveModeActive) vm.stopLiveCoachMatch()
+                    onNavigateUp()
+                }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = DosCyan)
                 }
                 Text(
@@ -188,21 +224,34 @@ fun CoachMatchdayScreen(
                     fontFamily = FontFamily.Monospace,
                 )
             }
-            val pending = state.fixtures.any { !it.played }
             DosButton(
-                text = if (pending) "SIMULAR" else "REPETIR",
+                text = when {
+                    state.liveModeRunning -> "EN VIVO..."
+                    pending && managerSelected && state.coachCommandsEnabled -> "JUGAR EN VIVO"
+                    pending -> "SIMULAR"
+                    else -> "REPETIR"
+                },
                 onClick = {
                     if (pending) {
-                        if (state.coachCommandsEnabled) {
+                        if (state.coachCommandsEnabled && managerSelected) {
                             vm.setCoachCommand(command)
+                            vm.startLiveCoachMatchday(
+                                matchday = matchday,
+                                seed = System.currentTimeMillis(),
+                                tickMs = liveSpeed.tickMs,
+                            )
+                        } else {
+                            if (state.coachCommandsEnabled) {
+                                vm.setCoachCommand(command)
+                            }
+                            val cmd = if (state.coachCommandsEnabled) command else CoachCommand.BALANCED
+                            vm.simulateMatchday(matchday, System.currentTimeMillis(), cmd)
                         }
-                        val cmd = if (state.coachCommandsEnabled) command else CoachCommand.BALANCED
-                        vm.simulateMatchday(matchday, System.currentTimeMillis(), cmd)
                     } else {
                         replayNonce += 1
                     }
                 },
-                enabled = !state.loading && selectedFixture != null,
+                enabled = !state.loading && selectedFixture != null && !state.liveModeRunning,
                 color = if (pending) DosGreen else DosCyan,
             )
         }
@@ -217,6 +266,13 @@ fun CoachMatchdayScreen(
                     vm.setCoachCommand(it)
                 },
             )
+            if (pending && managerSelected && !state.liveModeRunning) {
+                Spacer(Modifier.height(6.dp))
+                LiveSpeedBar(
+                    selected = liveSpeed,
+                    onSelect = { liveSpeed = it },
+                )
+            }
         } else {
             Text(
                 text = "Modo Basico: simulacion automatica sin comandos de banquillo",
@@ -263,12 +319,13 @@ fun CoachMatchdayScreen(
 
             Column(modifier = Modifier.weight(2f)) {
                 selectedFixture?.let { fixture ->
+                    val showingLive = state.liveModeActive && state.liveFixtureId == fixture.id
                     Scoreboard(
                         fixture = fixture,
                         home = state.teamNames[fixture.homeTeamId] ?: "LOCAL",
                         away = state.teamNames[fixture.awayTeamId] ?: "VISITANTE",
-                        displayHomeGoals = if (fixture.played) liveHomeGoals else -1,
-                        displayAwayGoals = if (fixture.played) liveAwayGoals else -1,
+                        displayHomeGoals = if (fixture.played || showingLive) liveHomeGoals else -1,
+                        displayAwayGoals = if (fixture.played || showingLive) liveAwayGoals else -1,
                         minute = liveMinute,
                         replayInProgress = replayInProgress,
                     )
@@ -346,6 +403,38 @@ private fun CoachCommandBar(
                     color = if (active) DosYellow else DosLightGray,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveSpeedBar(
+    selected: LiveHumanSpeed,
+    onSelect: (LiveHumanSpeed) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        LiveHumanSpeed.values().forEach { speed ->
+            val active = speed == selected
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .border(1.dp, if (active) DosYellow else DosGray)
+                    .background(if (active) DosNavy else DosBlack)
+                    .clickable { onSelect(speed) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            ) {
+                Text(
+                    text = "HUMANO ${speed.label}",
+                    color = if (active) DosYellow else DosGray,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
                 )
             }
         }
@@ -598,6 +687,13 @@ private data class CoachEventUi(
 private data class CoachBallPosition(
     val x: Float,
     val y: Float,
+)
+
+private fun MatchEvent.toCoachEventUi(): CoachEventUi = CoachEventUi(
+    minute = minute,
+    type = type.name,
+    teamId = teamId,
+    description = description,
 )
 
 private fun parseFixtureEvents(eventsJson: String): List<CoachEventUi> {

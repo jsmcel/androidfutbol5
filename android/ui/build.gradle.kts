@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:season-state"))
     implementation(project(":competition-engine"))
+    implementation(project(":match-sim"))
     implementation(project(":promanager"))
     implementation(project(":manager-economy"))
 

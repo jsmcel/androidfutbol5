@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.pcfutbol.core.data.db.PlayerEntity
+import com.pcfutbol.economy.TransferOffer
 import com.pcfutbol.ui.components.DosButton
 import com.pcfutbol.ui.components.DosPanel
 import com.pcfutbol.ui.theme.DosBlack
@@ -185,6 +186,28 @@ fun TransferMarketScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        if (state.aiOffers.isNotEmpty()) {
+            DosPanel(
+                title = "OFERTAS IA (${state.aiOffers.size})",
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                LazyColumn(
+                    modifier = Modifier.height(118.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    items(state.aiOffers) { offer ->
+                        AiOfferRow(
+                            offer = offer,
+                            clubName = state.teamNamesById[offer.toTeamId] ?: "Equipo ${offer.toTeamId}",
+                            enabled = state.windowOpen && !state.loading,
+                            onAccept = { vm.acceptAiOffer(offer) },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         DosPanel(title = panelTitle(state.tab, players.size), modifier = Modifier.weight(1f)) {
             if (state.loading) {
                 Text("Cargando...", color = DosGray, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
@@ -255,6 +278,45 @@ fun TransferMarketScreen(
                 vm.sell(player.pid, amount)
                 selectedSell = null
             },
+        )
+    }
+}
+
+@Composable
+private fun AiOfferRow(
+    offer: TransferOffer,
+    clubName: String,
+    enabled: Boolean,
+    onAccept: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "${offer.playerName}  ${offer.amountK}K",
+            color = DosWhite,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+        )
+        Text(
+            text = clubName.take(14),
+            color = DosLightGray,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            modifier = Modifier.width(92.dp),
+            maxLines = 1,
+        )
+        DosButton(
+            text = "ACEPTAR",
+            onClick = onAccept,
+            enabled = enabled,
+            color = DosCyan,
+            modifier = Modifier.width(92.dp),
         )
     }
 }

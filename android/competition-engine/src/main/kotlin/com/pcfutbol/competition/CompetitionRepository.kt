@@ -44,6 +44,26 @@ class CompetitionRepository @Inject constructor(
     suspend fun pendingFixtures(comp: String): Int =
         fixtureDao.pendingCount(comp)
 
+    suspend fun fixtureById(fixtureId: Int): FixtureEntity? =
+        fixtureDao.byId(fixtureId)
+
+    suspend fun buildMatchContextForFixture(
+        fixtureId: Int,
+        masterSeed: Long,
+    ): MatchContext? {
+        val fixture = fixtureDao.byId(fixtureId) ?: return null
+        val home = buildTeamInput(fixture.homeTeamId, isHome = true)
+        val away = buildTeamInput(fixture.awayTeamId, isHome = false)
+        val seed = masterSeed xor fixture.id.toLong()
+        return MatchContext(
+            fixtureId = fixture.id,
+            home = home,
+            away = away,
+            seed = seed,
+            neutral = fixture.neutral,
+        )
+    }
+
     suspend fun setupAllLeagues(codes: Collection<String>? = null) {
         val leagueCodes = codes?.toList()
             ?: competitionDao.all()
@@ -63,6 +83,7 @@ class CompetitionRepository @Inject constructor(
         competitionCode: String,
         matchday: Int,
         masterSeed: Long,
+        forcedResults: Map<Int, MatchResult> = emptyMap(),
     ): MatchdayResult {
         decrementPlayerAvailabilityCounters()
 
@@ -75,11 +96,16 @@ class CompetitionRepository @Inject constructor(
 
         val results = mutableListOf<MatchResult>()
         fixtures.forEach { fixture ->
-            val home = buildTeamInput(fixture.homeTeamId, isHome = true)
-            val away = buildTeamInput(fixture.awayTeamId, isHome = false)
-            val seed = masterSeed xor fixture.id.toLong()
-            val ctx = MatchContext(fixture.id, home, away, seed, fixture.neutral)
-            val result = MatchSimulator.simulate(ctx)
+            val forcedResult = forcedResults[fixture.id]
+            val seed = forcedResult?.seed ?: (masterSeed xor fixture.id.toLong())
+            val result = if (forcedResult != null) {
+                forcedResult
+            } else {
+                val home = buildTeamInput(fixture.homeTeamId, isHome = true)
+                val away = buildTeamInput(fixture.awayTeamId, isHome = false)
+                val ctx = MatchContext(fixture.id, home, away, seed, fixture.neutral)
+                MatchSimulator.simulate(ctx)
+            }
             fixtureDao.recordResult(
                 id = fixture.id,
                 hg = result.homeGoals,

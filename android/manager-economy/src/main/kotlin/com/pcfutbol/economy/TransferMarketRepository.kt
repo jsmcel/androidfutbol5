@@ -13,6 +13,7 @@ import com.pcfutbol.core.data.db.TeamEntity
 import com.pcfutbol.core.data.db.normalizedPresidentSalaryCapMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import java.time.LocalDate
 import kotlin.random.Random
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -279,15 +280,89 @@ class TransferMarketRepository @Inject constructor(
         return Result.success("${player.nameShort} vendido a ${buyer.nameShort} por ${askingPriceK}K")
     }
 
-    /**
-     * Placeholder para futuras ofertas IA activas.
-     */
     suspend fun generateAiOffers(managerTeamId: Int): List<TransferOffer> {
         val state = seasonStateDao.get() ?: return emptyList()
         if (!state.transferWindowOpen) return emptyList()
+        val managerTeam = teamDao.byId(managerTeamId) ?: return emptyList()
         val squad = playerDao.byTeamNow(managerTeamId)
+            .filter { it.status == 0 && it.injuryWeeksLeft <= 0 && it.sanctionMatchesLeft <= 0 }
         if (squad.isEmpty()) return emptyList()
-        return emptyList()
+        val allTeams = teamDao.allTeams().first()
+            .filter { it.slotId != managerTeamId && it.budgetK > 500 }
+        if (allTeams.isEmpty()) return emptyList()
+
+        val trendBoost = state.marketTrend.coerceIn(-20, 20) * 0.004
+        val multiplier = marketDynamicsMultiplier(state)
+        val currentYear = LocalDate.now().year
+        val seed = state.season.hashCode().toLong() xor
+            (state.currentMatchday.toLong() * 1_315_423_911L) xor
+            (managerTeamId.toLong() * 97L)
+        val rng = Random(seed)
+
+        val managerComp = managerTeam.competitionKey
+        val buyerPool = allTeams.sortedByDescending { it.budgetK }
+        val candidates = squad
+            .sortedByDescending { player ->
+                val age = (currentYear - player.birthYear).coerceIn(16, 40)
+                player.ca * 3 + (100 - age)
+            }
+            .take(14)
+            .shuffled(rng)
+
+        val offers = mutableListOf<TransferOffer>()
+        candidates.forEach { player ->
+            val age = (currentYear - player.birthYear).coerceIn(16, 40)
+            val baseInterest = when {
+                player.ca >= 84 -> 0.72
+                player.ca >= 78 -> 0.58
+                player.ca >= 72 -> 0.42
+                else -> 0.24
+            }
+            val ageAdjust = when {
+                age <= 22 -> 0.10
+                age >= 33 -> -0.10
+                else -> 0.0
+            }
+            val moraleAdjust = (player.moral.coerceIn(0, 100) - 50) * 0.0015
+            val chance = (baseInterest + ageAdjust + moraleAdjust + trendBoost).coerceIn(0.08, 0.90)
+            if (rng.nextDouble() > chance) return@forEach
+
+            val preferredBuyers = buyerPool.filter { it.competitionKey == managerComp && it.budgetK > 1_500 }
+            val anyBuyers = buyerPool.filter { it.budgetK > 1_500 }
+            val shortlist = (preferredBuyers + anyBuyers)
+                .distinctBy { it.slotId }
+                .take(16)
+            if (shortlist.isEmpty()) return@forEach
+            val buyer = shortlist[rng.nextInt(shortlist.size)]
+
+            val marketBaseValueK = WageCalculator.marketValueK(player, managerComp)
+            val aggression = 0.92 + rng.nextDouble() * 0.40
+            val offerAmountK = (marketBaseValueK * multiplier * aggression).toInt().coerceAtLeast(80)
+            if (buyer.budgetK < offerAmountK) return@forEach
+
+            val terms = projectedContractTerms(
+                player = player,
+                destinationCompetition = buyer.competitionKey,
+                season = state.season,
+            )
+            offers += TransferOffer(
+                playerId = player.pid,
+                playerName = player.nameShort.ifBlank { player.nameFull }.ifBlank { "Jugador ${player.pid}" },
+                fromTeamId = managerTeamId,
+                toTeamId = buyer.slotId,
+                amountK = offerAmountK,
+                wageK = terms.wageK,
+                status = OfferStatus.PENDING,
+            )
+            if (offers.size >= 8) return@forEach
+        }
+
+        return offers
+            .groupBy { it.playerId }
+            .values
+            .map { group -> group.maxByOrNull { it.amountK } ?: group.first() }
+            .sortedByDescending { it.amountK }
+            .take(6)
     }
 
     private fun evaluateOfferAcceptance(
